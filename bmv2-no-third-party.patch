@@ -1,0 +1,122 @@
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: aclocal.m4
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: autom4te.cache
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: build
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: compile
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: config.guess
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: config.h.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: config.h.in~
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: config.sub
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: configure
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: depcomp
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/include: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: install-sh
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: ltmain.sh
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/m4: libtool.m4
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/m4: lt~obsolete.m4
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/m4: ltoptions.m4
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/m4: ltsugar.m4
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/m4: ltversion.m4
+diff -ru p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/Makefile.am p4-bmv2-1.14.0/behavioral-model-1.14.0/Makefile.am
+--- p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/Makefile.am	2021-11-06 05:34:36.478718503 -0700
++++ p4-bmv2-1.14.0/behavioral-model-1.14.0/Makefile.am	2021-11-06 07:03:13.531441612 -0700
+@@ -18,7 +18,7 @@
+ endif
+ 
+ # simple_switch depends on libbmpi so PI needs to appear first
+-SUBDIRS = $(MAYBE_THRIFT) third_party src include \
++SUBDIRS = $(MAYBE_THRIFT) src include \
+ $(MAYBE_TESTS) $(MAYBE_PI) $(MAYBE_TARGETS) tools $(MAYBE_PDFIXED)
+ 
+ # I am leaving all style-related files (cpplint) out of dist on purpose, maybe
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: missing
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/pdfixed/include: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/pdfixed: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/PI: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: py-compile
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/src/bf_lpm_trie: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/src/bm_apps/examples: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/src/bm_apps: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/src/BMI: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/src/bm_runtime: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/src/bm_sim: Makefile.in
+diff -ru p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/src/Makefile.am p4-bmv2-1.14.0/behavioral-model-1.14.0/src/Makefile.am
+--- p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/src/Makefile.am	2021-11-06 05:34:36.484718557 -0700
++++ p4-bmv2-1.14.0/behavioral-model-1.14.0/src/Makefile.am	2021-11-06 07:03:13.531441612 -0700
+@@ -26,8 +26,7 @@
+ libbmall_la_LIBADD = \
+ $(top_builddir)/src/bm_sim/libbmsim.la \
+ $(top_builddir)/src/bf_lpm_trie/libbflpmtrie.la \
+-$(top_builddir)/src/BMI/libbmi.la \
+-$(top_builddir)/third_party/jsoncpp/libjson.la
++$(top_builddir)/src/BMI/libbmi.la
+ 
+ if COND_THRIFT
+ libbmall_la_LIBADD += \
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/src: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/l2_switch/learn_client: Makefile.in
+diff -ru p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/l2_switch/Makefile.am p4-bmv2-1.14.0/behavioral-model-1.14.0/targets/l2_switch/Makefile.am
+--- p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/l2_switch/Makefile.am	2021-11-06 05:34:36.488718592 -0700
++++ p4-bmv2-1.14.0/behavioral-model-1.14.0/targets/l2_switch/Makefile.am	2021-11-06 07:04:07.546926427 -0700
+@@ -11,5 +11,5 @@
+ $(top_builddir)/src/bf_lpm_trie/libbflpmtrie.la \
+ $(top_builddir)/thrift_src/libruntimestubs.la \
+ $(top_builddir)/src/BMI/libbmi.la \
+-$(top_builddir)/third_party/jsoncpp/libjson.la \
++-ljson-c \
+ -lboost_system $(THRIFT_LIB) -lboost_program_options -lboost_filesystem
+Only in p4-bmv2-1.14.0/behavioral-model-1.14.0/targets/l2_switch: Makefile.am~
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/l2_switch: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets: Makefile.in
+diff -ru p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/psa_switch/Makefile.am p4-bmv2-1.14.0/behavioral-model-1.14.0/targets/psa_switch/Makefile.am
+--- p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/psa_switch/Makefile.am	2021-11-06 05:34:36.489718601 -0700
++++ p4-bmv2-1.14.0/behavioral-model-1.14.0/targets/psa_switch/Makefile.am	2021-11-06 07:03:37.754659026 -0700
+@@ -14,7 +14,7 @@
+ $(top_builddir)/src/bm_sim/libbmsim.la \
+ $(top_builddir)/src/bf_lpm_trie/libbflpmtrie.la \
+ $(top_builddir)/src/BMI/libbmi.la \
+-$(top_builddir)/third_party/jsoncpp/libjson.la \
++-ljson-c \
+ -lboost_system $(THRIFT_LIB) -lboost_program_options -lboost_filesystem
+ 
+ if COND_THRIFT
+Only in p4-bmv2-1.14.0/behavioral-model-1.14.0/targets/psa_switch: Makefile.am~
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/psa_switch: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/psa_switch/tests: Makefile.in
+diff -ru p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/simple_router/Makefile.am p4-bmv2-1.14.0/behavioral-model-1.14.0/targets/simple_router/Makefile.am
+--- p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/simple_router/Makefile.am	2021-11-06 05:34:36.489718601 -0700
++++ p4-bmv2-1.14.0/behavioral-model-1.14.0/targets/simple_router/Makefile.am	2021-11-06 07:04:30.398131527 -0700
+@@ -6,5 +6,5 @@
+ $(top_builddir)/src/bf_lpm_trie/libbflpmtrie.la \
+ $(top_builddir)/thrift_src/libruntimestubs.la \
+ $(top_builddir)/src/BMI/libbmi.la \
+-$(top_builddir)/third_party/jsoncpp/libjson.la \
++-ljson-c \
+ -lboost_system $(THRIFT_LIB) -lboost_program_options -lboost_filesystem
+Only in p4-bmv2-1.14.0/behavioral-model-1.14.0/targets/simple_router: Makefile.am~
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/simple_router: Makefile.in
+diff -ru p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/simple_switch/Makefile.am p4-bmv2-1.14.0/behavioral-model-1.14.0/targets/simple_switch/Makefile.am
+--- p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/simple_switch/Makefile.am	2021-11-06 05:34:36.490718610 -0700
++++ p4-bmv2-1.14.0/behavioral-model-1.14.0/targets/simple_switch/Makefile.am	2021-11-06 07:03:13.532441621 -0700
+@@ -32,7 +32,7 @@
+ $(top_builddir)/src/bm_sim/libbmsim.la \
+ $(top_builddir)/src/bf_lpm_trie/libbflpmtrie.la \
+ $(top_builddir)/src/BMI/libbmi.la \
+-$(top_builddir)/third_party/jsoncpp/libjson.la \
++-ljson-c \
+ -lboost_system $(THRIFT_LIB) -lboost_program_options -lboost_filesystem
+ 
+ libsimpleswitch_runner_la_LIBADD = \
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/simple_switch: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/simple_switch/tests/CLI_tests: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/targets/simple_switch/tests: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0: test-driver
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/tests: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/tests/stress_tests: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/third_party/gtest: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/third_party/jsoncpp: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/third_party: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/third_party/spdlog: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/thrift_src: Makefile.in
+Only in p4-bmv2-1.14.0.orig/behavioral-model-1.14.0/tools: Makefile.in
+Only in p4-bmv2-1.14.0.orig: p4-bmv2-1.14.0
