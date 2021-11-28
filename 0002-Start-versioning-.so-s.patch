@@ -1,0 +1,66 @@
+From c7ce588e3199667a7bf60dad1ee04ef73ddc04cd Mon Sep 17 00:00:00 2001
+From: Tom Rix <trix@redhat.com>
+Date: Sat, 27 Nov 2021 11:37:10 -0800
+Subject: [PATCH 2/2] Start versioning *.so's
+
+As a dependency of p4c, it is important to track the version
+of the bmv2 libraries.  Start with 0.1.0.
+
+Signed-off-by: Tom Rix <trix@redhat.com>
+---
+ configure.ac                      | 6 ++++++
+ src/Makefile.am                   | 3 +++
+ targets/simple_switch/Makefile.am | 2 ++
+ 3 files changed, 11 insertions(+)
+
+diff --git a/configure.ac b/configure.ac
+index db435cf..d22b337 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -10,6 +10,12 @@ AC_CONFIG_HEADERS([config.h])
+ 
+ AC_SUBST([BM_VERSION], [AC_PACKAGE_VERSION])
+ 
++# Versions of the libraries
++# On linux x:y:z -> *.so.(x-z).(z).(y)
++AC_SUBST([BMALL_SO_VERSION], [1:0:1])
++AC_SUBST([BMP4APPS_SO_VERSION], [1:0:1])
++AC_SUBST([SIMPLESWITCH_RUNNER_SO_VERSION], [1:0:1])
++
+ # Pyhton is optional to the package
+ m4_define_default([_AM_PYTHON_INTERPRETER_LIST], [python2 python2.7])
+ AM_PATH_PYTHON([2.7],, [:])
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 32aa6f8..1064faa 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -18,6 +18,7 @@ libbmp4apps_la_SOURCES =
+ # Dummy C++ source to cause C++ linking.
+ nodist_EXTRA_libbmp4apps_la_SOURCES = dummy.cpp
+ libbmp4apps_la_LIBADD = bm_apps/libbmapps.la
++libbmp4apps_la_LDFLAGS = -version-info $(BMP4APPS_SO_VERSION)
+ endif
+ 
+ libbmall_la_SOURCES =
+@@ -37,3 +38,5 @@ endif
+ 
+ libbmall_la_LIBADD += \
+ -lboost_system $(THRIFT_LIB) -lboost_program_options -lboost_filesystem
++
++libbmall_la_LDFLAGS = -version-info $(BMALL_SO_VERSION)
+diff --git a/targets/simple_switch/Makefile.am b/targets/simple_switch/Makefile.am
+index ee1bc7e..9a0ddc0 100644
+--- a/targets/simple_switch/Makefile.am
++++ b/targets/simple_switch/Makefile.am
+@@ -39,6 +39,8 @@ libsimpleswitch_runner_la_LIBADD = \
+ $(PI_LIB) \
+ libsimpleswitch.la
+ 
++libsimpleswitch_runner_la_LDFLAGS = -version-info $(SIMPLESWITCH_RUNNER_SO_VERSION)
++
+ if COND_THRIFT
+ 
+ simple_switch_thrift_py_files = \
+-- 
+2.33.1
+

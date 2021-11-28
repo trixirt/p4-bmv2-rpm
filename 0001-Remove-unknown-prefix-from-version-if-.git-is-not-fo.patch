@@ -1,0 +1,43 @@
+From 6529f955d35eb5c4c2e2b518fa42578a214e72df Mon Sep 17 00:00:00 2001
+From: Tom Rix <trix@redhat.com>
+Date: Fri, 26 Nov 2021 09:09:02 -0800
+Subject: [PATCH 1/2] Remove -unknown prefix from version if .git is not found
+
+When building from a tarball, there will be no .git directory
+Instead of reporting an unknown hash, use only the VERSION
+file.
+
+Signed-off-by: Tom Rix <trix@redhat.com>
+---
+ tools/get_version.sh | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/tools/get_version.sh b/tools/get_version.sh
+index f512aa1..08a0119 100755
+--- a/tools/get_version.sh
++++ b/tools/get_version.sh
+@@ -29,9 +29,7 @@ bversion_str=""
+ if [ -f $bf_path ]; then
+     bversion_str="$(cat $bf_path | tr -d '\n')"
+ else
+-    if [ ! -d "$THIS_DIR/../.git" ]; then
+-        bversion_str="unknown"
+-    else
++    if [ -d "$THIS_DIR/../.git" ]; then
+         git_sha_str="$(git rev-parse @)"
+         if [ $? -ne 0 ]; then
+             bversion_str="unknown"
+@@ -41,7 +39,9 @@ else
+     fi
+ fi
+ 
+-version_str="$version_str-$bversion_str"
++if [ ! -z $bversion_str ]; then
++    version_str="$version_str-$bversion_str"
++fi
+ 
+ # Omit the trailing newline, so that m4_esyscmd can use the result directly.
+ printf %s "$version_str"
+-- 
+2.33.1
+

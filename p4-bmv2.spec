@@ -8,6 +8,10 @@ URL:            https://p4.org/
 Source0:        https://github.com/p4lang/behavioral-model/archive/refs/tags/%{version}.tar.gz
 # change explict paths to third_party/libfoo.a to -lfoo
 Patch1:         bmv2-no-third-party.patch
+# cleanup version string
+Patch2:         0001-Remove-unknown-prefix-from-version-if-.git-is-not-fo.patch
+# Fix rpmlint *.so version error
+Patch3:         0002-Start-versioning-.so-s.patch
 
 BuildRequires:  autoconf automake
 BuildRequires:  boost-devel
@@ -19,7 +23,6 @@ BuildRequires:  nanomsg-devel
 Requires:       boost
 Requires:       gmp
 Requires:       Judy json-c
-Requires:       libpcap
 Requires:       nanomsg
 
 %description
@@ -47,12 +50,17 @@ that P4 program.
 rm -rf %{name}-%{version}/behavioral-model-%{version}/third_party
 # Fixup makefiles from third_party removal, use normal libs
 %patch1 -p1
+cd behavioral-model-%{version}
+%patch2 -p1
+%patch3 -p1
 
 %build
 cd behavioral-model-%{version}
 ./autogen.sh
 mkdir build
 cd build
+
+# Neither static libraries nor thrift features are needed for p4c
 ../configure \
     --prefix=%{_prefix} \
     --libdir=%{_libdir} \
@@ -62,28 +70,45 @@ cd build
 make %{?_smp_mflags} 
 
 %install
-cd behavioral-model-%{version}/build
-make install prefix=%{buildroot}%{_prefix} libdir=%{buildroot}%{_libdir}
+cd behavioral-model-%{version}
+# license
+%{__mkdir_p} %{buildroot}%{_datadir}/p4-bmv2
+%{__cp} LICENSE %{buildroot}%{_datadir}/p4-bmv2/LICENSE
+cd build
+make install prefix=%{buildroot}%{_prefix} libdir=%{buildroot}/%{_libdir}
+
+%files
+%dir %{_datadir}/p4-bmv2
+%license %{_datadir}/p4-bmv2/LICENSE
+%{_bindir}/bm_nanomsg_events
+%{_bindir}/bm_p4dbg
+%{_libdir}/libbmall.so.0.1.0
+%{_libdir}/libbmp4apps.so.0.1.0
+%{_libdir}/libsimpleswitch_runner.so.0.1.0
 
 %files devel
-%{_bindir}/bm_*
 %dir %{_includedir}/bm
 %{_includedir}/bm/*
-%{_libdir}/*
+%{_libdir}/libbmall.la
+%{_libdir}/libbmall.so
+%{_libdir}/libbmall.so.0
+%{_libdir}/libbmp4apps.la
+%{_libdir}/libbmp4apps.so
+%{_libdir}/libbmp4apps.so.0
+%{_libdir}/libsimpleswitch_runner.la
+%{_libdir}/libsimpleswitch_runner.so
+%{_libdir}/libsimpleswitch_runner.so.0
 
-%exclude   /usr/lib/python2.7/site-packages/nanomsg_client.py
-%exclude   /usr/lib/python2.7/site-packages/nanomsg_client.pyc
-%exclude   /usr/lib/python2.7/site-packages/nanomsg_client.pyo
-%exclude   /usr/lib/python2.7/site-packages/p4dbg.py
-%exclude   /usr/lib/python2.7/site-packages/p4dbg.pyc
-%exclude   /usr/lib/python2.7/site-packages/p4dbg.pyo
-   
-#%{_python2_sitelib}/nanomsg_client.py*
-#%{_python2_sitelib}/p4dbg.py*
-
+# exclude python
+%exclude /usr/lib/python2.7/site-packages/nanomsg_client.py
+%exclude /usr/lib/python2.7/site-packages/nanomsg_client.pyc
+%exclude /usr/lib/python2.7/site-packages/nanomsg_client.pyo
+%exclude /usr/lib/python2.7/site-packages/p4dbg.py
+%exclude /usr/lib/python2.7/site-packages/p4dbg.pyc
+%exclude /usr/lib/python2.7/site-packages/p4dbg.pyo
 
 %changelog
-* Wed Nov 3 2021 <trix@redhat.com> - 1.2.2-1
+* Fri Nov 26 2021 <trix@redhat.com> - 1.14.0-1
 - Initial release
 
 
