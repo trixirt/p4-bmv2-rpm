@@ -1,0 +1,33 @@
+From ce7862dbc71763687365b94b6a84bc347e68b5d2 Mon Sep 17 00:00:00 2001
+From: Radostin Stoyanov <rst0git@users.noreply.github.com>
+Date: Sat, 24 Apr 2021 19:21:06 +0100
+Subject: [PATCH] simple_switch_grpc: Use Python 3 (#997)
+
+Support for Python 3 was introduced with commit 13d7267
+and most of the occurrences of `python` have been replaced
+with `python3` with commit a633059.
+
+This patch updates the autoconf configuration in simple_switch_grpc
+to use Python 3 as well.
+
+Signed-off-by: Radostin Stoyanov <rstoyanov@fedoraproject.org>
+---
+ targets/simple_switch_grpc/configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/targets/simple_switch_grpc/configure.ac b/targets/simple_switch_grpc/configure.ac
+index b12a45b..a99813d 100644
+--- a/targets/simple_switch_grpc/configure.ac
++++ b/targets/simple_switch_grpc/configure.ac
+@@ -9,7 +9,7 @@ AC_CONFIG_HEADERS([config.h])
+ AC_PROG_CC
+ AC_PROG_CXX
+ 
+-AM_PATH_PYTHON([2.7],, [:])
++AM_PATH_PYTHON([3.5],, [:])
+ 
+ LT_INIT
+ 
+-- 
+2.33.1
+

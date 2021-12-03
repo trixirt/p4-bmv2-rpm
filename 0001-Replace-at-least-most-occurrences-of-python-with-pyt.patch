@@ -1,0 +1,352 @@
+From 01966890151221cd12b3b55b46760e2a5bb4adb4 Mon Sep 17 00:00:00 2001
+From: Andy Fingerhut <andy_fingerhut@alum.wustl.edu>
+Date: Wed, 9 Dec 2020 11:51:21 -0800
+Subject: [PATCH] Replace at least most occurrences of python with python3
+ (#960)
+
+* Replace at least most occurrences of python with python3
+This enables running on an Ubuntu system that has no /usr/bin/python
+executable at all, only python3.
+
+So far, there are still probably occurrences of python or python2 in
+these places:
+
+tools/macos/ and files in subdirectories beneath it
+tools/cpplint.py
+Dockerfile.noPI
+
+I have tested with these changes on Ubuntu 18.04 and 20.04, but not on
+maOS.
+
+* Remove known Python code added explicitly for Python2 compatibility
+Also revert change to tools/cpplint.py, which is still Python2 only
+---
+ configure.ac                                      |  2 +-
+ install_deps.sh                                   |  6 ++++--
+ mininet/1sw_demo.py                               |  2 +-
+ mininet/stress_test_ipv4.py.in                    |  2 +-
+ targets/psa_switch/psa_switch_CLI.in              |  2 +-
+ targets/psa_switch/pswitch_CLI.py                 |  2 +-
+ targets/simple_switch/simple_switch_CLI.in        |  2 +-
+ targets/simple_switch/sswitch_CLI.py              |  2 +-
+ .../tests/CLI_tests/run_one_test.py.in            |  7 ++-----
+ targets/simple_switch_grpc/gnmi_sub_on_change.py  |  2 +-
+ targets/simple_switch_grpc/gnmi_sub_once.py       |  2 +-
+ tests/stress_tests/gen_udp_tcp_traffic.py         |  2 +-
+ tools/bm_CLI.in                                   |  2 +-
+ tools/bm_nanomsg_events.in                        |  2 +-
+ tools/bm_p4dbg.in                                 |  2 +-
+ tools/bmpy_utils.py                               |  2 +-
+ tools/nanomsg_client.py                           |  4 +---
+ tools/p4dbg.py                                    | 12 +-----------
+ tools/runtime_CLI.py                              | 15 +++------------
+ travis/install-nnpy.sh                            |  4 ++--
+ travis/install-thrift.sh                          |  2 +-
+ 21 files changed, 28 insertions(+), 50 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index f71fa3d..f663566 100755
+--- a/configure.ac
++++ b/configure.ac
+@@ -17,7 +17,7 @@ AC_SUBST([BMP4APPS_SO_VERSION], [1:0:1])
+ AC_SUBST([SIMPLESWITCH_RUNNER_SO_VERSION], [1:0:1])
+ 
+ # Python is optional to the package
+-m4_define_default([_AM_PYTHON_INTERPRETER_LIST], [python3 python2 python2.7])
++m4_define_default([_AM_PYTHON_INTERPRETER_LIST], [python3])
+ AM_PATH_PYTHON([3.5],, [:])
+ 
+ coverage_enabled=no
+diff --git a/install_deps.sh b/install_deps.sh
+index 7acf14d..58dbd1c 100755
+--- a/install_deps.sh
++++ b/install_deps.sh
+@@ -6,6 +6,8 @@ then
+     # This older package libssl1.0-dev enables compiling Thrift 0.9.2
+     # on Ubuntu 18.04.  Package libssl-dev exists, but Thrift 0.9.2
+     # fails to compile when it is installed.
++    # TBD: whether using this package makes a difference for Ubuntu
++    # 18.04 and Thrift 0.11.0.
+     LIBSSL_DEV="libssl1.0-dev"
+ else
+     LIBSSL_DEV="libssl-dev"
+@@ -30,8 +32,8 @@ sudo apt-get install -y \
+     g++ \
+     $LIBSSL_DEV \
+     libffi-dev \
+-    python-dev \
+-    python-pip \
++    python3-dev \
++    python3-pip \
+     wget
+ 
+ tmpdir=`mktemp -d -p .`
+diff --git a/mininet/1sw_demo.py b/mininet/1sw_demo.py
+index 99c3849..9744231 100755
+--- a/mininet/1sw_demo.py
++++ b/mininet/1sw_demo.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/mininet/stress_test_ipv4.py.in b/mininet/stress_test_ipv4.py.in
+index 44fe998..47c01e8 100755
+--- a/mininet/stress_test_ipv4.py.in
++++ b/mininet/stress_test_ipv4.py.in
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/targets/psa_switch/psa_switch_CLI.in b/targets/psa_switch/psa_switch_CLI.in
+index 03861d7..d458aab 100755
+--- a/targets/psa_switch/psa_switch_CLI.in
++++ b/targets/psa_switch/psa_switch_CLI.in
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/targets/psa_switch/pswitch_CLI.py b/targets/psa_switch/pswitch_CLI.py
+index bf89c77..771a3ec 100755
+--- a/targets/psa_switch/pswitch_CLI.py
++++ b/targets/psa_switch/pswitch_CLI.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/targets/simple_switch/simple_switch_CLI.in b/targets/simple_switch/simple_switch_CLI.in
+index 2f926e1..21c2d5c 100755
+--- a/targets/simple_switch/simple_switch_CLI.in
++++ b/targets/simple_switch/simple_switch_CLI.in
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/targets/simple_switch/sswitch_CLI.py b/targets/simple_switch/sswitch_CLI.py
+index b9d4138..bd8b801 100755
+--- a/targets/simple_switch/sswitch_CLI.py
++++ b/targets/simple_switch/sswitch_CLI.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/targets/simple_switch/tests/CLI_tests/run_one_test.py.in b/targets/simple_switch/tests/CLI_tests/run_one_test.py.in
+index 6311bcc..b4a5486 100755
+--- a/targets/simple_switch/tests/CLI_tests/run_one_test.py.in
++++ b/targets/simple_switch/tests/CLI_tests/run_one_test.py.in
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -122,10 +122,7 @@ def main():
+             sys.exit(3)
+ 
+     assert(out)
+-
+-    if sys.version_info >= (3, 0):
+-        # force string conversion for Python2 and Python3 compatibility
+-        out = out.decode()
++    out = out.decode()
+ 
+     def parse_data(s, pattern):
+         m = re.findall("{}(.*?)(?={})".format(pattern, pattern), s,
+diff --git a/targets/simple_switch_grpc/gnmi_sub_on_change.py b/targets/simple_switch_grpc/gnmi_sub_on_change.py
+index 4b69f57..e4006f1 100755
+--- a/targets/simple_switch_grpc/gnmi_sub_on_change.py
++++ b/targets/simple_switch_grpc/gnmi_sub_on_change.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/targets/simple_switch_grpc/gnmi_sub_once.py b/targets/simple_switch_grpc/gnmi_sub_once.py
+index 0c27be5..d062b1c 100755
+--- a/targets/simple_switch_grpc/gnmi_sub_once.py
++++ b/targets/simple_switch_grpc/gnmi_sub_once.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/tests/stress_tests/gen_udp_tcp_traffic.py b/tests/stress_tests/gen_udp_tcp_traffic.py
+index a3a53cc..a10d21c 100755
+--- a/tests/stress_tests/gen_udp_tcp_traffic.py
++++ b/tests/stress_tests/gen_udp_tcp_traffic.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ 
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+diff --git a/tools/bm_CLI.in b/tools/bm_CLI.in
+index a59a634..bc729ca 100755
+--- a/tools/bm_CLI.in
++++ b/tools/bm_CLI.in
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/tools/bm_nanomsg_events.in b/tools/bm_nanomsg_events.in
+index 303dbc1..da1e13c 100755
+--- a/tools/bm_nanomsg_events.in
++++ b/tools/bm_nanomsg_events.in
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/tools/bm_p4dbg.in b/tools/bm_p4dbg.in
+index 1fa2d3c..826ac45 100755
+--- a/tools/bm_p4dbg.in
++++ b/tools/bm_p4dbg.in
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/tools/bmpy_utils.py b/tools/bmpy_utils.py
+index f28281c..7b75663 100644
+--- a/tools/bmpy_utils.py
++++ b/tools/bmpy_utils.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ 
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+diff --git a/tools/nanomsg_client.py b/tools/nanomsg_client.py
+index cd06d44..20e1ce3 100755
+--- a/tools/nanomsg_client.py
++++ b/tools/nanomsg_client.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -18,8 +18,6 @@
+ # Antonin Bas (antonin@barefootnetworks.com)
+ #
+ #
+-# enable prints without line break
+-from __future__ import print_function
+ 
+ import nnpy
+ import struct
+diff --git a/tools/p4dbg.py b/tools/p4dbg.py
+index ab0f62b..dba99e6 100755
+--- a/tools/p4dbg.py
++++ b/tools/p4dbg.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -19,16 +19,6 @@
+ #
+ #
+ 
+-
+-# enable prints without line break
+-from __future__ import print_function
+-# bind raw_input to input for Python2<>3 compatibility
+-try:
+-    input = raw_input
+-except NameError:
+-    pass
+-
+-
+ import nnpy
+ import struct
+ import sys
+diff --git a/tools/runtime_CLI.py b/tools/runtime_CLI.py
+index 536c9bb..1f8784f 100755
+--- a/tools/runtime_CLI.py
++++ b/tools/runtime_CLI.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -19,9 +19,6 @@
+ #
+ #
+ 
+-# enable prints without line break
+-from __future__ import print_function
+-
+ import argparse
+ import cmd
+ from collections import Counter
+@@ -662,10 +659,7 @@ def parse_match_key(table, key_fields):
+ 
+ 
+ def printable_byte_str(s):
+-    if sys.version_info >= (3, 0):
+-        # different byte processing in Python 3
+-        return ":".join([format(c, "02x") for c in s])
+-    return "".join("{:02x}".format(ord(c)) for c in s)
++    return ":".join([format(c, "02x") for c in s])
+ 
+ 
+ def BmMatchParam_to_str(self):
+@@ -882,10 +876,7 @@ def parse_bool(s):
+ 
+ 
+ def hexstr(v):
+-    if sys.version_info >= (3, 0):
+-        # different byte processing in Python 3
+-        return "".join([format(c, "02x") for c in v])
+-    return "".join("{:02x}".format(ord(c)) for c in v)
++    return "".join([format(c, "02x") for c in v])
+ 
+ 
+ class RuntimeAPI(cmd.Cmd):
+diff --git a/travis/install-nnpy.sh b/travis/install-nnpy.sh
+index 77a7d63..0336a66 100644
+--- a/travis/install-nnpy.sh
++++ b/travis/install-nnpy.sh
+@@ -4,6 +4,6 @@ git clone https://github.com/nanomsg/nnpy.git
+ # top of tree won't install
+ cd nnpy
+ git checkout c7e718a5173447c85182dc45f99e2abcf9cd4065
+-sudo pip install cffi
+-sudo pip install .
++sudo pip3 install cffi
++sudo pip3 install .
+ cd ..
+diff --git a/travis/install-thrift.sh b/travis/install-thrift.sh
+index 2ea4177..dec85f3 100644
+--- a/travis/install-thrift.sh
++++ b/travis/install-thrift.sh
+@@ -15,5 +15,5 @@ cd thrift-0.9.2
+ ./configure --with-cpp=yes --with-c_glib=no --with-java=no --with-ruby=no --with-erlang=no --with-go=no --with-nodejs=no
+ make -j2 && sudo make install
+ cd lib/py
+-sudo python setup.py install
++sudo python3 setup.py install
+ cd ../../..
+-- 
+2.33.1
+

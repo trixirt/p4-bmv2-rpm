@@ -12,6 +12,13 @@ Patch1:         bmv2-no-third-party.patch
 Patch2:         0001-Remove-unknown-prefix-from-version-if-.git-is-not-fo.patch
 # Fix rpmlint *.so version error
 Patch3:         0002-Start-versioning-.so-s.patch
+# python2 -> python3
+Patch4:         0001-Add-support-for-systems-that-have-Python3-only-951.patch
+# usr/bin/env python -> usr/bin/python3
+Patch5:         0001-Replace-at-least-most-occurrences-of-python-with-pyt.patch
+# Followon fixes for python3 change
+Patch6:         0001-simple_switch_grpc-Use-Python-3-997.patch
+Patch7:         0001-Fix-issues-in-p4dbg.py-after-switch-to-Python3-1017.patch
 
 BuildRequires:  autoconf automake
 BuildRequires:  boost-devel
@@ -24,6 +31,7 @@ Requires:       boost
 Requires:       gmp
 Requires:       Judy json-c
 Requires:       nanomsg
+Requires:       python3-nnpy
 
 %description
 This is the second version of the reference P4 software switch,
@@ -53,6 +61,10 @@ rm -rf %{name}-%{version}/behavioral-model-%{version}/third_party
 cd behavioral-model-%{version}
 %patch2 -p1
 %patch3 -p1
+%patch4 -p1
+%patch5 -p1
+%patch6 -p1
+%patch7 -p1
 
 %build
 cd behavioral-model-%{version}
@@ -85,6 +97,8 @@ make install prefix=%{buildroot}%{_prefix} libdir=%{buildroot}/%{_libdir}
 %{_libdir}/libbmall.so.0.1.0
 %{_libdir}/libbmp4apps.so.0.1.0
 %{_libdir}/libsimpleswitch_runner.so.0.1.0
+%{python3_sitelib}/nanomsg_client.py
+%{python3_sitelib}/p4dbg.py
 
 %files devel
 %dir %{_includedir}/bm
@@ -99,13 +113,7 @@ make install prefix=%{buildroot}%{_prefix} libdir=%{buildroot}/%{_libdir}
 %{_libdir}/libsimpleswitch_runner.so
 %{_libdir}/libsimpleswitch_runner.so.0
 
-# exclude python
-%exclude /usr/lib/python2.7/site-packages/nanomsg_client.py
-%exclude /usr/lib/python2.7/site-packages/nanomsg_client.pyc
-%exclude /usr/lib/python2.7/site-packages/nanomsg_client.pyo
-%exclude /usr/lib/python2.7/site-packages/p4dbg.py
-%exclude /usr/lib/python2.7/site-packages/p4dbg.pyc
-%exclude /usr/lib/python2.7/site-packages/p4dbg.pyo
+%exclude %{python3_sitelib}/__pycache__/*
 
 %changelog
 * Fri Nov 26 2021 <trix@redhat.com> - 1.14.0-1

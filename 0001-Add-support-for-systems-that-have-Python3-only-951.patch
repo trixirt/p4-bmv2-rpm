@@ -1,0 +1,2813 @@
+From dc8da19162e4f0a1574ac411333cd12a5f2ba1a9 Mon Sep 17 00:00:00 2001
+From: fruffy <5960321+fruffy@users.noreply.github.com>
+Date: Tue, 6 Oct 2020 20:17:04 +0200
+Subject: [PATCH] Add support for systems that have Python3 only (#951)
+
+---
+ Dockerfile                                    |   1 +
+ configure.ac                                  |   6 +-
+ mininet/1sw_demo.py                           |  15 +-
+ mininet/p4_mininet.py                         |  10 +-
+ mininet/stress_test_ipv4.py.in                |   3 +-
+ targets/psa_switch/psa_switch_CLI.in          |   3 +-
+ targets/psa_switch/pswitch_CLI.py             |  13 +-
+ targets/simple_switch/simple_switch_CLI.in    |   3 +-
+ targets/simple_switch/sswitch_CLI.py          |  11 +-
+ .../tests/CLI_tests/run_one_test.py.in        |  24 +-
+ .../tests/CLI_tests/testdata/indirect_res.out |   2 +-
+ .../simple_switch_grpc/gnmi_sub_on_change.py  |  25 +-
+ targets/simple_switch_grpc/gnmi_sub_once.py   |  19 +-
+ tests/stress_tests/gen_udp_tcp_traffic.py     |   8 +-
+ tools/bm_CLI.in                               |   3 +-
+ tools/bm_nanomsg_events.in                    |   3 +-
+ tools/bm_p4dbg.in                             |   3 +-
+ tools/bmpy_utils.py                           |  12 +-
+ tools/check_style.sh                          |   7 +
+ tools/cpplint.py                              |   6 +-
+ tools/nanomsg_client.py                       | 137 +++--
+ tools/p4dbg.py                                | 126 ++---
+ tools/runtime_CLI.py                          | 466 +++++++++++-------
+ 23 files changed, 534 insertions(+), 372 deletions(-)
+ mode change 100644 => 100755 configure.ac
+ mode change 100644 => 100755 mininet/p4_mininet.py
+ mode change 100644 => 100755 mininet/stress_test_ipv4.py.in
+ mode change 100644 => 100755 targets/psa_switch/psa_switch_CLI.in
+ mode change 100644 => 100755 targets/psa_switch/pswitch_CLI.py
+ mode change 100644 => 100755 targets/simple_switch/simple_switch_CLI.in
+ mode change 100644 => 100755 targets/simple_switch/sswitch_CLI.py
+ mode change 100644 => 100755 targets/simple_switch/tests/CLI_tests/run_one_test.py.in
+ mode change 100644 => 100755 tools/bm_CLI.in
+ mode change 100644 => 100755 tools/bm_nanomsg_events.in
+ mode change 100644 => 100755 tools/bm_p4dbg.in
+
+diff --git a/Dockerfile b/Dockerfile
+index c175139..e8ab016 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -50,6 +50,7 @@ RUN apt-get update && \
+     add-apt-repository -y ppa:ubuntu-toolchain-r/test && \
+     apt-get update && \
+     apt-get install -y --no-install-recommends $BM_DEPS $BM_RUNTIME_DEPS && \
++    ln -sf /usr/bin/python3 /usr/bin/python && \
+     ./autogen.sh && \
+     if [ "$GCOV" != "" ]; then ./configure --with-pdfixed --with-pi --with-stress-tests --enable-debugger --enable-coverage --enable-Werror; fi && \
+     if [ "$GCOV" = "" ]; then ./configure --with-pdfixed --with-pi --with-stress-tests --enable-debugger --enable-Werror; fi && \
+diff --git a/configure.ac b/configure.ac
+old mode 100644
+new mode 100755
+index d22b337..f71fa3d
+--- a/configure.ac
++++ b/configure.ac
+@@ -16,9 +16,9 @@ AC_SUBST([BMALL_SO_VERSION], [1:0:1])
+ AC_SUBST([BMP4APPS_SO_VERSION], [1:0:1])
+ AC_SUBST([SIMPLESWITCH_RUNNER_SO_VERSION], [1:0:1])
+ 
+-# Pyhton is optional to the package
+-m4_define_default([_AM_PYTHON_INTERPRETER_LIST], [python2 python2.7])
+-AM_PATH_PYTHON([2.7],, [:])
++# Python is optional to the package
++m4_define_default([_AM_PYTHON_INTERPRETER_LIST], [python3 python2 python2.7])
++AM_PATH_PYTHON([3.5],, [:])
+ 
+ coverage_enabled=no
+ AC_ARG_ENABLE([coverage],
+diff --git a/mininet/1sw_demo.py b/mininet/1sw_demo.py
+index 6472c19..99c3849 100755
+--- a/mininet/1sw_demo.py
++++ b/mininet/1sw_demo.py
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -53,7 +52,7 @@ class SingleSwitchTopo(Topo):
+                                 thrift_port = thrift_port,
+                                 pcap_dump = pcap_dump)
+ 
+-        for h in xrange(n):
++        for h in range(n):
+             host = self.addHost('h%d' % (h + 1),
+                                 ip = "10.0.%d.10/24" % h,
+                                 mac = '00:04:00:00:00:%02x' %h)
+@@ -75,11 +74,11 @@ def main():
+     net.start()
+ 
+ 
+-    sw_mac = ["00:aa:bb:00:00:%02x" % n for n in xrange(num_hosts)]
++    sw_mac = ["00:aa:bb:00:00:%02x" % n for n in range(num_hosts)]
+ 
+-    sw_addr = ["10.0.%d.1" % n for n in xrange(num_hosts)]
++    sw_addr = ["10.0.%d.1" % n for n in range(num_hosts)]
+ 
+-    for n in xrange(num_hosts):
++    for n in range(num_hosts):
+         h = net.get('h%d' % (n + 1))
+         if mode == "l2":
+             h.setDefaultRoute("dev eth0")
+@@ -87,13 +86,13 @@ def main():
+             h.setARP(sw_addr[n], sw_mac[n])
+             h.setDefaultRoute("dev eth0 via %s" % sw_addr[n])
+ 
+-    for n in xrange(num_hosts):
++    for n in range(num_hosts):
+         h = net.get('h%d' % (n + 1))
+         h.describe()
+ 
+     sleep(1)
+ 
+-    print "Ready !"
++    print("Ready !")
+ 
+     CLI( net )
+     net.stop()
+diff --git a/mininet/p4_mininet.py b/mininet/p4_mininet.py
+old mode 100644
+new mode 100755
+index 0fe8328..0cb0c78
+--- a/mininet/p4_mininet.py
++++ b/mininet/p4_mininet.py
+@@ -40,14 +40,14 @@ class P4Host(Host):
+         return r
+ 
+     def describe(self):
+-        print "**********"
+-        print self.name
+-        print "default interface: %s\t%s\t%s" %(
++        print("**********")
++        print(self.name)
++        print("default interface: %s\t%s\t%s" %(
+             self.defaultIntf().name,
+             self.defaultIntf().IP(),
+             self.defaultIntf().MAC()
+-        )
+-        print "**********"
++        ))
++        print("**********")
+ 
+ class P4Switch(Switch):
+     """P4 virtual switch"""
+diff --git a/mininet/stress_test_ipv4.py.in b/mininet/stress_test_ipv4.py.in
+old mode 100644
+new mode 100755
+index fef2c4e..44fe998
+--- a/mininet/stress_test_ipv4.py.in
++++ b/mininet/stress_test_ipv4.py.in
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/targets/psa_switch/psa_switch_CLI.in b/targets/psa_switch/psa_switch_CLI.in
+old mode 100644
+new mode 100755
+index 3fec140..03861d7
+--- a/targets/psa_switch/psa_switch_CLI.in
++++ b/targets/psa_switch/psa_switch_CLI.in
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/targets/psa_switch/pswitch_CLI.py b/targets/psa_switch/pswitch_CLI.py
+old mode 100644
+new mode 100755
+index d4af47d..bf89c77
+--- a/targets/psa_switch/pswitch_CLI.py
++++ b/targets/psa_switch/pswitch_CLI.py
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -37,7 +36,7 @@ def handle_bad_input(f):
+             return f(*args, **kwargs)
+         except InvalidMirroringOperation as e:
+             error = MirroringOperationErrorCode._VALUES_TO_NAMES[e.code]
+-            print "Invalid mirroring operation (%s)" % error
++            print("Invalid mirroring operation (%s)" % error)
+     return handle
+ 
+ class PsaSwitchAPI(runtime_CLI.RuntimeAPI):
+@@ -90,7 +89,7 @@ class PsaSwitchAPI(runtime_CLI.RuntimeAPI):
+         mgrp = self.parse_int(args[1], "mgrp")
+         config = MirroringSessionConfig(mgid=mgrp)
+         self.pswitch_client.mirroring_session_add(mirror_id, config)
+-        print "Associating multicast group", mgrp, "to mirroring session", mirror_id
++        print("Associating multicast group", mgrp, "to mirroring session", mirror_id)
+ 
+     @handle_bad_input
+     def do_mirroring_delete(self, line):
+@@ -105,17 +104,17 @@ class PsaSwitchAPI(runtime_CLI.RuntimeAPI):
+         self.exactly_n_args(args, 1)
+         mirror_id = self.parse_int(args[0], "mirror_id")
+         config = self.pswitch_client.mirroring_session_get(mirror_id)
+-        print config
++        print(config)
+ 
+     @handle_bad_input
+     def do_get_time_elapsed(self, line):
+         "Get time elapsed (in microseconds) since the switch started: get_time_elapsed"
+-        print self.pswitch_client.get_time_elapsed_us()
++        print(self.pswitch_client.get_time_elapsed_us())
+ 
+     @handle_bad_input
+     def do_get_time_since_epoch(self, line):
+         "Get time elapsed (in microseconds) since the switch clock's epoch: get_time_since_epoch"
+-        print self.pswitch_client.get_time_since_epoch_us()
++        print(self.pswitch_client.get_time_since_epoch_us())
+ 
+ def load_json_psa(json):
+ 
+diff --git a/targets/simple_switch/simple_switch_CLI.in b/targets/simple_switch/simple_switch_CLI.in
+old mode 100644
+new mode 100755
+index 88a56ce..2f926e1
+--- a/targets/simple_switch/simple_switch_CLI.in
++++ b/targets/simple_switch/simple_switch_CLI.in
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/targets/simple_switch/sswitch_CLI.py b/targets/simple_switch/sswitch_CLI.py
+old mode 100644
+new mode 100755
+index 0a754b9..b9d4138
+--- a/targets/simple_switch/sswitch_CLI.py
++++ b/targets/simple_switch/sswitch_CLI.py
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -38,7 +37,7 @@ def handle_bad_input(f):
+             return f(*args, **kwargs)
+         except InvalidMirroringOperation as e:
+             error = MirroringOperationErrorCode._VALUES_TO_NAMES[e.code]
+-            print "Invalid mirroring operation (%s)" % error
++            print("Invalid mirroring operation (%s)" % error)
+     return handle
+ 
+ class SimpleSwitchAPI(runtime_CLI.RuntimeAPI):
+@@ -110,17 +109,17 @@ class SimpleSwitchAPI(runtime_CLI.RuntimeAPI):
+         self.exactly_n_args(args, 1)
+         mirror_id = self.parse_int(args[0], "mirror_id")
+         config = self.sswitch_client.mirroring_session_get(mirror_id)
+-        print config
++        print(config)
+ 
+     @handle_bad_input
+     def do_get_time_elapsed(self, line):
+         "Get time elapsed (in microseconds) since the switch started: get_time_elapsed"
+-        print self.sswitch_client.get_time_elapsed_us()
++        print(self.sswitch_client.get_time_elapsed_us())
+ 
+     @handle_bad_input
+     def do_get_time_since_epoch(self, line):
+         "Get time elapsed (in microseconds) since the switch clock's epoch: get_time_since_epoch"
+-        print self.sswitch_client.get_time_since_epoch_us()
++        print(self.sswitch_client.get_time_since_epoch_us())
+ 
+ def main():
+     args = runtime_CLI.get_parser().parse_args()
+diff --git a/targets/simple_switch/tests/CLI_tests/run_one_test.py.in b/targets/simple_switch/tests/CLI_tests/run_one_test.py.in
+old mode 100644
+new mode 100755
+index 7c12f0a..6311bcc
+--- a/targets/simple_switch/tests/CLI_tests/run_one_test.py.in
++++ b/targets/simple_switch/tests/CLI_tests/run_one_test.py.in
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -23,6 +22,8 @@ import random
+ import re
+ 
+ # Class written by Mihai Budiu, for Barefoot Networks, Inc.
++
++
+ class ConcurrentInteger(object):
+     # Generates exclusive integers in a range 0-max
+     # in a way which is safe across multiple processes.
+@@ -33,10 +34,13 @@ class ConcurrentInteger(object):
+     def __init__(self, folder, max):
+         self.folder = folder
+         self.max = max
++
+     def lockName(self, value):
+         return "lock_" + str(value)
++
+     def release(self, value):
+         os.rmdir(self.lockName(value))
++
+     def generate(self):
+         # try 10 times
+         for i in range(0, 10):
+@@ -51,6 +55,7 @@ class ConcurrentInteger(object):
+                 continue
+         return None
+ 
++
+ def main():
+     if len(sys.argv) < 4:
+         sys.exit(1)
+@@ -107,7 +112,7 @@ def main():
+         if "PYTHONPATH" in sub_env:
+             pythonpath = sub_env["PYTHONPATH"] + ":"
+         sub_env["PYTHONPATH"] = pythonpath + \
+-                                "@abs_top_builddir@/thrift_src/gen-py/"
++            "@abs_top_builddir@/thrift_src/gen-py/"
+         p = subprocess.Popen(cmd, stdin=f, stdout=subprocess.PIPE, env=sub_env)
+         out, _ = p.communicate()
+         rc = p.returncode
+@@ -118,6 +123,10 @@ def main():
+ 
+     assert(out)
+ 
++    if sys.version_info >= (3, 0):
++        # force string conversion for Python2 and Python3 compatibility
++        out = out.decode()
++
+     def parse_data(s, pattern):
+         m = re.findall("{}(.*?)(?={})".format(pattern, pattern), s,
+                        re.DOTALL)
+@@ -140,13 +149,14 @@ def main():
+             cleanup()
+             sys.exit(0)
+         else:
+-            print "Expected"
+-            print "\n".join(expected_parse)
+-            print "But got"
+-            print "\n".join(out_parsed)
++            print("Expected")
++            print("\n".join(expected_parse))
++            print("But got")
++            print("\n".join(out_parsed))
+ 
+     cleanup()
+     sys.exit(4)
+ 
++
+ if __name__ == '__main__':
+     main()
+diff --git a/targets/simple_switch/tests/CLI_tests/testdata/indirect_res.out b/targets/simple_switch/tests/CLI_tests/testdata/indirect_res.out
+index 99f9698..9f931f7 100644
+--- a/targets/simple_switch/tests/CLI_tests/testdata/indirect_res.out
++++ b/targets/simple_switch/tests/CLI_tests/testdata/indirect_res.out
+@@ -1,5 +1,5 @@
+ ????
+-my_indirect_counter[0]=  BmCounterValue(packets=0, bytes=0)
++my_indirect_counter[0]= (0 bytes, 0 packets)
+ ????
+ Invalid counter operation (INVALID_INDEX)
+ ????
+diff --git a/targets/simple_switch_grpc/gnmi_sub_on_change.py b/targets/simple_switch_grpc/gnmi_sub_on_change.py
+index b7601f0..4b69f57 100755
+--- a/targets/simple_switch_grpc/gnmi_sub_on_change.py
++++ b/targets/simple_switch_grpc/gnmi_sub_on_change.py
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -24,7 +23,7 @@ import google.protobuf.text_format
+ import signal
+ import sys
+ import threading
+-import Queue
++import queue
+ 
+ parser = argparse.ArgumentParser(description='Mininet demo')
+ parser.add_argument('--grpc-addr', help='P4Runtime gRPC server address',
+@@ -36,26 +35,26 @@ def main():
+     channel = grpc.insecure_channel(args.grpc_addr)
+     stub = gnmi_pb2.gNMIStub(channel)
+ 
+-    stream_out_q = Queue.Queue()
+-    stream_in_q = Queue.Queue()
++    stream_out_q = queue.Queue()
++    stream_in_q = queue.Queue()
+ 
+     def req_iterator():
+         while True:
+             req = stream_out_q.get()
+             if req is None:
+                 break
+-            print "***************************"
+-            print "REQUEST"
+-            print req
+-            print "***************************"
++            print("***************************")
++            print("REQUEST")
++            print(req)
++            print("***************************")
+             yield req
+ 
+     def stream_recv(stream):
+         for response in stream:
+-            print "***************************"
+-            print "RESPONSE"
+-            print response
+-            print "***************************"
++            print("***************************")
++            print("RESPONSE")
++            print(response)
++            print("***************************")
+             stream_in_q.put(response)
+ 
+     stream = stub.Subscribe(req_iterator())
+diff --git a/targets/simple_switch_grpc/gnmi_sub_once.py b/targets/simple_switch_grpc/gnmi_sub_once.py
+index 4100b52..0c27be5 100755
+--- a/targets/simple_switch_grpc/gnmi_sub_once.py
++++ b/targets/simple_switch_grpc/gnmi_sub_once.py
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -43,18 +42,18 @@ def main():
+             for name in ["interfaces", "interface", "..."]:
+                 e = path.elem.add()
+                 e.name = name
+-            print "***************************"
+-            print "REQUEST"
+-            print req
+-            print "***************************"
++            print("***************************")
++            print("REQUEST")
++            print(req)
++            print("***************************")
+             yield req
+             return
+ 
+     for response in stub.Subscribe(req_iterator()):
+-        print "***************************"
+-        print "RESPONSE"
+-        print response
+-        print "***************************"
++        print("***************************")
++        print("RESPONSE")
++        print(response)
++        print("***************************")
+ 
+ if __name__ == '__main__':
+     main()
+diff --git a/tests/stress_tests/gen_udp_tcp_traffic.py b/tests/stress_tests/gen_udp_tcp_traffic.py
+index 609c88f..a3a53cc 100755
+--- a/tests/stress_tests/gen_udp_tcp_traffic.py
++++ b/tests/stress_tests/gen_udp_tcp_traffic.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python2
++#!/usr/bin/env python
+ 
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+@@ -45,7 +45,7 @@ args = parser.parse_args()
+ 
+ def get_rand_mac():
+     res = []
+-    for i in xrange(6):
++    for i in range(6):
+         b = random.randint(0, 255)
+         res.append(hex(b)[2:])
+     return ":".join(res)
+@@ -53,7 +53,7 @@ def get_rand_mac():
+ def main():
+     random.seed(args.seed)
+     patterns = []
+-    for i in xrange(args.patterns):
++    for i in range(args.patterns):
+         transport = random.choice([UDP, TCP])
+         dst, src = get_rand_mac(), get_rand_mac()
+         # cannot use fuzz() for Ethernet, or scapy tries to resolve the MAC
+@@ -63,7 +63,7 @@ def main():
+         p = p / payload
+         patterns.append(p)
+     packets = []
+-    for i in xrange(args.packets):
++    for i in range(args.packets):
+         p = random.choice(patterns)
+         packets.append(p)
+     with open(args.out, 'w') as f:
+diff --git a/tools/bm_CLI.in b/tools/bm_CLI.in
+old mode 100644
+new mode 100755
+index d3a2d9c..a59a634
+--- a/tools/bm_CLI.in
++++ b/tools/bm_CLI.in
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/tools/bm_nanomsg_events.in b/tools/bm_nanomsg_events.in
+old mode 100644
+new mode 100755
+index cf8a9dd..303dbc1
+--- a/tools/bm_nanomsg_events.in
++++ b/tools/bm_nanomsg_events.in
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/tools/bm_p4dbg.in b/tools/bm_p4dbg.in
+old mode 100644
+new mode 100755
+index a9ff222..1fa2d3c
+--- a/tools/bm_p4dbg.in
++++ b/tools/bm_p4dbg.in
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+diff --git a/tools/bmpy_utils.py b/tools/bmpy_utils.py
+index f5f9e06..f28281c 100644
+--- a/tools/bmpy_utils.py
++++ b/tools/bmpy_utils.py
+@@ -21,7 +21,7 @@
+ #
+ 
+ import sys
+-import md5
++import hashlib
+ 
+ from thrift import Thrift
+ from thrift.transport import TSocket
+@@ -29,9 +29,10 @@ from thrift.transport import TTransport
+ from thrift.protocol import TBinaryProtocol
+ from thrift.protocol import TMultiplexedProtocol
+ 
++
+ def check_JSON_md5(client, json_src, out=sys.stdout):
+     with open(json_src, 'r') as f:
+-        m = md5.new()
++        m = hashlib.md5()
+         for L in f:
+             m.update(L)
+         md5sum = m.digest()
+@@ -56,6 +57,7 @@ def check_JSON_md5(client, json_src, out=sys.stdout):
+         my_print("{:<15}: {}\n".format("CLI input md5", md5sum_str))
+         my_print("**********\n")
+ 
++
+ def get_json_config(standard_client=None, json_path=None, out=sys.stdout):
+     def my_print(s):
+         out.write(s)
+@@ -77,6 +79,8 @@ def get_json_config(standard_client=None, json_path=None, out=sys.stdout):
+         return json_cfg
+ 
+ # services is [(service_name, client_class), ...]
++
++
+ def thrift_connect(thrift_ip, thrift_port, services, out=sys.stdout):
+     def my_print(s):
+         out.write(s)
+@@ -94,7 +98,8 @@ def thrift_connect(thrift_ip, thrift_port, services, out=sys.stdout):
+         if service_name is None:
+             clients.append(None)
+             continue
+-        protocol = TMultiplexedProtocol.TMultiplexedProtocol(bprotocol, service_name)
++        protocol = TMultiplexedProtocol.TMultiplexedProtocol(
++            bprotocol, service_name)
+         client = service_cls(protocol)
+         clients.append(client)
+ 
+@@ -110,6 +115,7 @@ def thrift_connect(thrift_ip, thrift_port, services, out=sys.stdout):
+ 
+     return clients
+ 
++
+ def thrift_connect_standard(thrift_ip, thrift_port, out=sys.stdout):
+     from bm_runtime.standard import Standard
+     return thrift_connect(thrift_ip, thrift_port,
+diff --git a/tools/check_style.sh b/tools/check_style.sh
+index d290540..385554e 100755
+--- a/tools/check_style.sh
++++ b/tools/check_style.sh
+@@ -29,4 +29,11 @@ run_cpplint $ROOT_DIR/pdfixed/include pdfixed/include
+ 
+ run_cpplint $ROOT_DIR/PI PI
+ 
++echo "********************************"
++if [ $return_status -eq 0 ]; then
++    echo "STYLE CHECK SUCCESS"
++else
++    echo "STYLE CHECK FAILURE"
++fi
++
+ exit $return_status
+diff --git a/tools/cpplint.py b/tools/cpplint.py
+index f0aafa4..584c68b 100755
+--- a/tools/cpplint.py
++++ b/tools/cpplint.py
+@@ -1667,7 +1667,7 @@ def GetHeaderGuardCPPVariable(filename):
+   filename = re.sub(r'/\.flymake/([^/]*)$', r'/\1', filename)
+   # Replace 'c++' with 'cpp'.
+   filename = filename.replace('C++', 'cpp').replace('c++', 'cpp')
+-  
++
+   fileinfo = FileInfo(filename)
+   file_path_from_root = fileinfo.RepositoryName()
+   if _root:
+@@ -4795,7 +4795,7 @@ def CheckLanguage(filename, clean_lines, linenum, file_extension,
+ 
+   # Make Windows paths like Unix.
+   fullname = os.path.abspath(filename).replace('\\', '/')
+-  
++
+   # Perform other checks now that we are sure that this is not an include line
+   CheckCasts(filename, clean_lines, linenum, error)
+   CheckGlobalStatic(filename, clean_lines, linenum, error)
+@@ -6035,7 +6035,7 @@ def ProcessFileData(filename, file_extension, lines, error,
+   nesting_state.CheckCompletedBlocks(filename, error)
+ 
+   CheckForIncludeWhatYouUse(filename, clean_lines, include_state, error)
+-  
++
+   # Check that the .cc file has included its header if it exists.
+   if file_extension == 'cc':
+     CheckHeaderFileIncluded(filename, include_state, error)
+diff --git a/tools/nanomsg_client.py b/tools/nanomsg_client.py
+index 64e4112..cd06d44 100755
+--- a/tools/nanomsg_client.py
++++ b/tools/nanomsg_client.py
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -19,6 +18,8 @@
+ # Antonin Bas (antonin@barefootnetworks.com)
+ #
+ #
++# enable prints without line break
++from __future__ import print_function
+ 
+ import nnpy
+ import struct
+@@ -26,6 +27,7 @@ import sys
+ import json
+ import argparse
+ 
++
+ parser = argparse.ArgumentParser(description='BM nanomsg event logger client')
+ parser.add_argument('--socket', help='Nanomsg socket to which to subscribe',
+                     action="store", required=False)
+@@ -38,6 +40,7 @@ parser.add_argument('--thrift-ip', help='Thrift IP address for table updates. If
+ 
+ args = parser.parse_args()
+ 
++
+ class NameMap:
+     def __init__(self):
+         self.names = {}
+@@ -65,13 +68,16 @@ class NameMap:
+                 self.names[("condition", obj["id"])] = obj["name"]
+ 
+     def get_name(self, type_, id_):
+-        return self.names.get( (type_, id_), None )
++        return self.names.get((type_, id_), None)
++
+ 
+ name_map = NameMap()
+ 
++
+ def name_lookup(type_, id_):
+     return name_map.get_name(type_, id_)
+ 
++
+ class MSG_TYPES:
+     (PACKET_IN, PACKET_OUT,
+      PARSER_START, PARSER_DONE, PARSER_EXTRACT,
+@@ -79,7 +85,7 @@ class MSG_TYPES:
+      CHECKSUM_UPDATE,
+      PIPELINE_START, PIPELINE_DONE,
+      CONDITION_EVAL, TABLE_HIT, TABLE_MISS,
+-     ACTION_EXECUTE) = range(15)
++     ACTION_EXECUTE) = list(range(15))
+     CONFIG_CHANGE = 999
+ 
+     @staticmethod
+@@ -126,6 +132,7 @@ class MSG_TYPES:
+         }
+         return strs[type_]
+ 
++
+ class Msg(object):
+     def __init__(self, msg):
+         self.msg = msg
+@@ -148,6 +155,7 @@ class Msg(object):
+             (self.type_str, self.switch_id, self.cxt_id,
+              self.sig, self.id_, self.copy_id)
+ 
++
+ class PacketIn(Msg):
+     def __init__(self, msg):
+         super(PacketIn, self).__init__(msg)
+@@ -162,6 +170,7 @@ class PacketIn(Msg):
+         return super(PacketIn, self).__str__() +\
+             ", port_in: %d" % self.port_in
+ 
++
+ class PacketOut(Msg):
+     def __init__(self, msg):
+         super(PacketOut, self).__init__(msg)
+@@ -176,6 +185,7 @@ class PacketOut(Msg):
+         return super(PacketOut, self).__str__() +\
+             ", port_out: %d" % self.port_out
+ 
++
+ class ParserStart(Msg):
+     def __init__(self, msg):
+         super(ParserStart, self).__init__(msg)
+@@ -188,11 +198,13 @@ class ParserStart(Msg):
+ 
+     def __str__(self):
+         s = super(ParserStart, self).__str__()
+-        s += ", parser_id: " +  str(self.parser_id)
++        s += ", parser_id: " + str(self.parser_id)
+         name = name_lookup("parser", self.parser_id)
+-        if name: s += " (" + name + ")"
++        if name:
++            s += " (" + name + ")"
+         return s
+ 
++
+ class ParserDone(Msg):
+     def __init__(self, msg):
+         super(ParserDone, self).__init__(msg)
+@@ -205,11 +217,13 @@ class ParserDone(Msg):
+ 
+     def __str__(self):
+         s = super(ParserDone, self).__str__()
+-        s += ", parser_id: " +  str(self.parser_id)
++        s += ", parser_id: " + str(self.parser_id)
+         name = name_lookup("parser", self.parser_id)
+-        if name: s += " (" + name + ")"
++        if name:
++            s += " (" + name + ")"
+         return s
+ 
++
+ class ParserExtract(Msg):
+     def __init__(self, msg):
+         super(ParserExtract, self).__init__(msg)
+@@ -222,11 +236,13 @@ class ParserExtract(Msg):
+ 
+     def __str__(self):
+         s = super(ParserExtract, self).__str__()
+-        s += ", header_id: " +  str(self.header_id)
++        s += ", header_id: " + str(self.header_id)
+         name = name_lookup("header", self.header_id)
+-        if name: s += " (" + name + ")"
++        if name:
++            s += " (" + name + ")"
+         return s
+ 
++
+ class DeparserStart(Msg):
+     def __init__(self, msg):
+         super(DeparserStart, self).__init__(msg)
+@@ -239,11 +255,13 @@ class DeparserStart(Msg):
+ 
+     def __str__(self):
+         s = super(DeparserStart, self).__str__()
+-        s += ", deparser_id: " +  str(self.deparser_id)
++        s += ", deparser_id: " + str(self.deparser_id)
+         name = name_lookup("deparser", self.deparser_id)
+-        if name: s += " (" + name + ")"
++        if name:
++            s += " (" + name + ")"
+         return s
+ 
++
+ class DeparserDone(Msg):
+     def __init__(self, msg):
+         super(DeparserDone, self).__init__(msg)
+@@ -256,11 +274,13 @@ class DeparserDone(Msg):
+ 
+     def __str__(self):
+         s = super(DeparserDone, self).__str__()
+-        s += ", deparser_id: " +  str(self.deparser_id)
++        s += ", deparser_id: " + str(self.deparser_id)
+         name = name_lookup("deparser", self.deparser_id)
+-        if name: s += " (" + name + ")"
++        if name:
++            s += " (" + name + ")"
+         return s
+ 
++
+ class DeparserEmit(Msg):
+     def __init__(self, msg):
+         super(DeparserEmit, self).__init__(msg)
+@@ -269,15 +289,17 @@ class DeparserEmit(Msg):
+         self.struct_ = struct.Struct("i")
+ 
+     def extract(self):
+-         self.header_id, = super(DeparserEmit, self).extract()
++        self.header_id, = super(DeparserEmit, self).extract()
+ 
+     def __str__(self):
+         s = super(DeparserEmit, self).__str__()
+-        s += ", header_id: " +  str(self.header_id)
++        s += ", header_id: " + str(self.header_id)
+         name = name_lookup("header", self.header_id)
+-        if name: s += " (" + name + ")"
++        if name:
++            s += " (" + name + ")"
+         return s
+ 
++
+ class ChecksumUpdate(Msg):
+     def __init__(self, msg):
+         super(ChecksumUpdate, self).__init__(msg)
+@@ -286,15 +308,17 @@ class ChecksumUpdate(Msg):
+         self.struct_ = struct.Struct("i")
+ 
+     def extract(self):
+-         self.cksum_id, = super(ChecksumUpdate, self).extract()
++        self.cksum_id, = super(ChecksumUpdate, self).extract()
+ 
+     def __str__(self):
+         s = super(ChecksumUpdate, self).__str__()
+-        s += ", cksum_id: " +  str(self.cksum_id)
++        s += ", cksum_id: " + str(self.cksum_id)
+         name = name_lookup("checksum", self.cksum_id)
+-        if name: s += " (" + name + ")"
++        if name:
++            s += " (" + name + ")"
+         return s
+ 
++
+ class PipelineStart(Msg):
+     def __init__(self, msg):
+         super(PipelineStart, self).__init__(msg)
+@@ -307,11 +331,13 @@ class PipelineStart(Msg):
+ 
+     def __str__(self):
+         s = super(PipelineStart, self).__str__()
+-        s += ", pipeline_id: " +  str(self.pipeline_id)
++        s += ", pipeline_id: " + str(self.pipeline_id)
+         name = name_lookup("pipeline", self.pipeline_id)
+-        if name: s += " (" + name + ")"
++        if name:
++            s += " (" + name + ")"
+         return s
+ 
++
+ class PipelineDone(Msg):
+     def __init__(self, msg):
+         super(PipelineDone, self).__init__(msg)
+@@ -324,11 +350,13 @@ class PipelineDone(Msg):
+ 
+     def __str__(self):
+         s = super(PipelineDone, self).__str__()
+-        s += ", pipeline_id: " +  str(self.pipeline_id)
++        s += ", pipeline_id: " + str(self.pipeline_id)
+         name = name_lookup("pipeline", self.pipeline_id)
+-        if name: s += " (" + name + ")"
++        if name:
++            s += " (" + name + ")"
+         return s
+ 
++
+ class ConditionEval(Msg):
+     def __init__(self, msg):
+         super(ConditionEval, self).__init__(msg)
+@@ -342,9 +370,10 @@ class ConditionEval(Msg):
+ 
+     def __str__(self):
+         s = super(ConditionEval, self).__str__()
+-        s += ", condition_id: " +  str(self.condition_id)
++        s += ", condition_id: " + str(self.condition_id)
+         name = name_lookup("condition", self.condition_id)
+-        if name: s += " (" + name + ")"
++        if name:
++            s += " (" + name + ")"
+         s += ", result: " + str(self.result)
+         return s
+ 
+@@ -361,12 +390,14 @@ class TableHit(Msg):
+ 
+     def __str__(self):
+         s = super(TableHit, self).__str__()
+-        s += ", table_id: " +  str(self.table_id)
++        s += ", table_id: " + str(self.table_id)
+         name = name_lookup("table", self.table_id)
+-        if name: s += " (" + name + ")"
+-        s += ", entry_hdl: " +  str(self.entry_hdl)
++        if name:
++            s += " (" + name + ")"
++        s += ", entry_hdl: " + str(self.entry_hdl)
+         return s
+ 
++
+ class TableMiss(Msg):
+     def __init__(self, msg):
+         super(TableMiss, self).__init__(msg)
+@@ -379,11 +410,13 @@ class TableMiss(Msg):
+ 
+     def __str__(self):
+         s = super(TableMiss, self).__str__()
+-        s += ", table_id: " +  str(self.table_id)
++        s += ", table_id: " + str(self.table_id)
+         name = name_lookup("table", self.table_id)
+-        if name: s += " (" + name + ")"
++        if name:
++            s += " (" + name + ")"
+         return s
+ 
++
+ class ActionExecute(Msg):
+     def __init__(self, msg):
+         super(ActionExecute, self).__init__(msg)
+@@ -396,11 +429,13 @@ class ActionExecute(Msg):
+ 
+     def __str__(self):
+         s = super(ActionExecute, self).__str__()
+-        s += ", action_id: " +  str(self.action_id)
++        s += ", action_id: " + str(self.action_id)
+         name = name_lookup("action", self.action_id)
+-        if name: s += " (" + name + ")"
++        if name:
++            s += " (" + name + ")"
+         return s
+ 
++
+ class ConfigChange(Msg):
+     def __init__(self, msg):
+         super(ConfigChange, self).__init__(msg)
+@@ -414,14 +449,16 @@ class ConfigChange(Msg):
+     def __str__(self):
+         return "type: %s, switch_id: %d" % (self.type_str, self.switch_id)
+ 
++
+ def json_init(client):
+     if client is None:
+-        print "Unable to request new config from switch because Thrift is unavailable"
++        print("Unable to request new config from switch because Thrift is unavailable")
+         sys.exit(0)
+     import bmpy_utils as utils
+     json_cfg = utils.get_json_config(standard_client=client)
+     name_map.load_names(json_cfg)
+ 
++
+ def recv_msgs(socket_addr, client):
+     def get_msg_type(msg):
+         type_, = struct.unpack('i', msg[:4])
+@@ -438,23 +475,24 @@ def recv_msgs(socket_addr, client):
+         try:
+             p = MSG_TYPES.get_msg_class(msg_type)(msg)
+         except:
+-            print "Unknown msg type", msg_type
++            print("Unknown msg type", msg_type)
+             continue
+         p.extract()
+-        print p
++        print(p)
+ 
+         if p.type_ == MSG_TYPES.CONFIG_CHANGE:
+-            print "The JSON config has changed"
+-            print "Requesting new config from switch,",
+-            print "which may cause some log messages to be dropped"
++            print("The JSON config has changed")
++            print("Requesting new config from switch,", end=' ')
++            print("which may cause some log messages to be dropped")
+             json_init(client)
+ 
++
+ def main():
+     deprecated_args = []
+     for a in deprecated_args:
+         if getattr(args, a) is not None:
+-            print "Command line option '--{}' is deprecated".format(a),
+-            print "and will be ignored"
++            print("Command line option '--{}' is deprecated".format(a), end=' ')
++            print("and will be ignored")
+ 
+     client = None
+     socket_addr = None
+@@ -467,19 +505,21 @@ def main():
+         try:
+             import bmpy_utils as utils
+         except:
+-            print "When '--json' or '--socket' is not provided, the client needs bmpy_utils"
+-            print "bmpy_utils is not available when building bmv2 without Thrift support"
++            print(
++                "When '--json' or '--socket' is not provided, the client needs bmpy_utils")
++            print("bmpy_utils is not available when building bmv2 without Thrift support")
+             sys.exit(1)
+-        client = utils.thrift_connect_standard(args.thrift_ip, args.thrift_port)
++        client = utils.thrift_connect_standard(
++            args.thrift_ip, args.thrift_port)
+         info = client.bm_mgmt_get_info()
+         if info.elogger_socket is None:
+-            print "The event logger is not enabled on the switch,",
+-            print "run with '--nanolog <addr>'"
++            print("The event logger is not enabled on the switch,", end=' ')
++            print("run with '--nanolog <addr>'")
+             sys.exit(1)
+         if args.socket is None:
+             socket_addr = info.elogger_socket
+-            print "'--socket' not provided, using", socket_addr,
+-            print "(obtained from switch)"
++            print("'--socket' not provided, using", socket_addr, end=' ')
++            print("(obtained from switch)")
+ 
+         if args.json is None:
+             json_cfg = utils.get_json_config(standard_client=client)
+@@ -491,5 +531,6 @@ def main():
+ 
+     recv_msgs(socket_addr, client)
+ 
++
+ if __name__ == "__main__":
+     main()
+diff --git a/tools/p4dbg.py b/tools/p4dbg.py
+index 6870c6b..ab0f62b 100755
+--- a/tools/p4dbg.py
++++ b/tools/p4dbg.py
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -20,6 +19,16 @@
+ #
+ #
+ 
++
++# enable prints without line break
++from __future__ import print_function
++# bind raw_input to input for Python2<>3 compatibility
++try:
++    input = raw_input
++except NameError:
++    pass
++
++
+ import nnpy
+ import struct
+ import sys
+@@ -29,6 +38,7 @@ import cmd
+ from collections import defaultdict
+ from functools import wraps
+ 
++
+ try:
+     import runtime_CLI
+     with_runtime_CLI = True
+@@ -123,8 +133,8 @@ def get_all_fields():
+     return field_map.get_all_fields()
+ 
+ def enum(type_name, *sequential, **named):
+-    enums = dict(zip(sequential, range(len(sequential))), **named)
+-    reverse = dict((value, key) for key, value in enums.iteritems())
++    enums = dict(list(zip(sequential, list(range(len(sequential))))), **named)
++    reverse = dict((value, key) for key, value in enums.items())
+ 
+     @staticmethod
+     def to_str(x):
+@@ -336,7 +346,7 @@ def make_init_function(P, t, fmt):
+         if not fmt:
+             return
+         for k, v in kwargs.items():
+-            if k not in zip(*fmt)[0]:
++            if k not in list(zip(*fmt))[0]:
+                 continue
+             setattr(self, k, v)
+ 
+@@ -538,9 +548,9 @@ def handle_bad_input(f):
+         try:
+             return f(*args, **kwargs)
+         except UIn_Error as e:
+-            print "Error:", e
++            print("Error:", e)
+         except UIn_Warning as e:
+-            print "Error:", e
++            print("Error:", e)
+     return handle
+ 
+ def prompt_yes_no(question, yes_default=True):
+@@ -550,12 +560,12 @@ def prompt_yes_no(question, yes_default=True):
+     else:
+         prompt = "[y/N]"
+     while True:
+-        print question, prompt,
+-        choice = raw_input().lower()
++        print(question, prompt, end=' ')
++        choice = input().lower()
+         if choice in valid:
+             return valid[choice]
+         else:
+-            print "Please respond with 'yes' or 'no' (or 'y' or 'n')."
++            print("Please respond with 'yes' or 'no' (or 'y' or 'n').")
+ 
+ class DebuggerAPI(cmd.Cmd):
+     prompt = 'P4DBG: '
+@@ -569,7 +579,7 @@ class DebuggerAPI(cmd.Cmd):
+             self.sok.connect(self.addr)
+             self.sok.setsockopt(nnpy.SOL_SOCKET, nnpy.RCVTIMEO, 500)
+         except:
+-            print "Impossible to connect to provided socket (bad format?)"
++            print("Impossible to connect to provided socket (bad format?)")
+             sys.exit(1)
+         self.req_id = 0
+         self.switch_id = 0
+@@ -612,13 +622,13 @@ class DebuggerAPI(cmd.Cmd):
+     def init_runtime_CLI(self):
+         runtime_CLI.load_json_str(self.json_cfg)
+         self.runtime_CLI = runtime_CLI.RuntimeAPI(
+-            runtime_CLI.PreType.None, self.standard_client, mc_client=None)
++            runtime_CLI.PreType.none, self.standard_client, mc_client=None)
+ 
+     def attach(self):
+-        print "Connecting to the switch..."
++        print("Connecting to the switch...")
+         self.send_attach()
+         self.attached = True
+-        print "Connection established"
++        print("Connection established")
+ 
+     def send_attach(self):
+         req = Msg_Attach(switch_id = 0, req_id = self.get_req_id())
+@@ -626,13 +636,13 @@ class DebuggerAPI(cmd.Cmd):
+         try:
+             msg = self.wait_for_msg()
+         except AssertionError:
+-            print "Unable to attach to the switch,",
+-            print "maybe you need to run p4dbg as root?"
++            print("Unable to attach to the switch,", end=' ')
++            print("maybe you need to run p4dbg as root?")
+             sys.exit(1)
+         self.check_msg_CLS(msg, Msg_Status)
+ 
+     def do_EOF(self, line):
+-        print "Detaching from switch"
++        print("Detaching from switch")
+         self.say_bye()
+         return True
+ 
+@@ -672,15 +682,15 @@ class DebuggerAPI(cmd.Cmd):
+ 
+     def handle_config_change(self):
+         self.reset()
+-        print "We have been notified that the JSON config has changed on the",
+-        print "switch. The debugger state has therefore been reset."
++        print("We have been notified that the JSON config has changed on the", end=' ')
++        print("switch. The debugger state has therefore been reset.")
+ 
+         if not self.standard_client:
+-            print "Unable to request new config from switch because Thrift is unavailable"
++            print("Unable to request new config from switch because Thrift is unavailable")
+             sys.exit(0)
+ 
+-        print "You can request the new config and keep debugging,",
+-        print "or we will exit."
++        print("You can request the new config and keep debugging,", end=' ')
++        print("or we will exit.")
+ 
+         v = prompt_yes_no("Do you want to request the new config?", True)
+         if v:
+@@ -699,8 +709,8 @@ class DebuggerAPI(cmd.Cmd):
+                     self.get_me_a_prompt = True
+                 except AssertionError:
+                     # happens when there is a connection timeout
+-                    print "Connection to the switch lost,",
+-                    print "are you sure it is still running?"
++                    print("Connection to the switch lost,", end=' ')
++                    print("are you sure it is still running?")
+                     return
+             if msg.type == MsgType.KEEP_ALIVE:
+                 if self.get_me_a_prompt == True:
+@@ -723,18 +733,18 @@ class DebuggerAPI(cmd.Cmd):
+                 break
+         self.current_packet_id = msg.packet_id
+         self.current_copy_id = msg.copy_id
+-        print "New event for packet", self.packet_id_str(msg.packet_id, msg.copy_id)
++        print("New event for packet", self.packet_id_str(msg.packet_id, msg.copy_id))
+         return msg
+ 
+     def special_update(self, id_, v):
+         if id_ == FIELD_ID_CTR:
+             type_name, obj_name = resolve_ctr(v)
+             if 0x80 & (v >> 24):
+-                print "Exiting", type_name, "'%s'" % obj_name
++                print("Exiting", type_name, "'%s'" % obj_name)
+             else:
+-                print "Entering", type_name, "'%s'" % obj_name
++                print("Entering", type_name, "'%s'" % obj_name)
+         elif id_ == FIELD_ID_COND:
+-            print "Condition evaluated to", bool(v)
++            print("Condition evaluated to", bool(v))
+ 
+     @handle_bad_input
+     def do_continue(self, line):
+@@ -748,10 +758,10 @@ class DebuggerAPI(cmd.Cmd):
+                 self.special_update(msg.fid, msg.bytes_int)
+                 return
+             assert(msg.fid in self.wps)
+-            print "Watchpoint hit for field", get_name_from_field_id(msg.fid)
+-            print "New value is", msg.bytes_str, "(%d)" % msg.bytes_int
++            print("Watchpoint hit for field", get_name_from_field_id(msg.fid))
++            print("New value is", msg.bytes_str, "(%d)" % msg.bytes_int)
+         elif msg.type == MsgType.PACKET_IN:
+-            print "Packet in!"
++            print("Packet in!")
+         # elif msg.type == MsgType.PACKET_OUT:
+         #     pass
+         else:
+@@ -768,10 +778,10 @@ class DebuggerAPI(cmd.Cmd):
+             if msg.fid in {FIELD_ID_CTR, FIELD_ID_COND, FIELD_ID_ACTION}:
+                 self.special_update(msg.fid, msg.bytes_int)
+                 return
+-            print "Update for field", get_name_from_field_id(msg.fid)
+-            print "New value is", msg.bytes_str, "(%d)" % msg.bytes_int
++            print("Update for field", get_name_from_field_id(msg.fid))
++            print("New value is", msg.bytes_str, "(%d)" % msg.bytes_int)
+         elif msg.type == MsgType.PACKET_IN:
+-            print "Packet in!"
++            print("Packet in!")
+         # elif msg.type == MsgType.PACKET_OUT:
+         #     pass
+         else:
+@@ -847,7 +857,7 @@ class DebuggerAPI(cmd.Cmd):
+     def do_show_wps(self, line):
+         "Shows all the watchpoints set: show_wps"
+         for f_name in map(get_name_from_field_id, self.wps):
+-            print f_name
++            print(f_name)
+ 
+     @handle_bad_input
+     def do_break(self, line):
+@@ -906,7 +916,7 @@ class DebuggerAPI(cmd.Cmd):
+         args_cnt = len(args)
+         if not self.bps:
+             return []
+-        objs = map(resolve_ctr, self.bps)
++        objs = list(map(resolve_ctr, self.bps))
+         if (args_cnt == 1 and not text) or\
+            (args_cnt == 2 and text):
+             return [t for t in zip(*objs)[0] if t.startswith(text)]
+@@ -919,7 +929,7 @@ class DebuggerAPI(cmd.Cmd):
+     def do_show_bps(self, line):
+         "Shows all the breakpoints set: show_bps"
+         for t, n in map(resolve_ctr, self.bps):
+-            print t, "'%s'" % n
++            print(t, "'%s'" % n)
+ 
+     def get_req_id(self):
+         req_id = self.req_id
+@@ -947,8 +957,8 @@ class DebuggerAPI(cmd.Cmd):
+         if len(args) == 1:
+             if self.current_packet_id is None:
+                 raise UIn_Error("Cannot use this command because no packets have been observed yet")
+-            print "Packet id not specified, assuming current packet (%s)" \
+-                % self.current_packet_id_str()
++            print("Packet id not specified, assuming current packet (%s)" \
++                % self.current_packet_id_str())
+             packet_id = self.current_packet_id
+             copy_id = self.current_copy_id
+             field_name = args[0]
+@@ -966,16 +976,16 @@ class DebuggerAPI(cmd.Cmd):
+         msg = self.wait_for_msg()
+         if msg.type == MsgType.STATUS:
+             if msg.status == 1:
+-                print "Unknown packet id. Maybe it left the switch already"
++                print("Unknown packet id. Maybe it left the switch already")
+             elif msg.status == 2:
+-                print "We have not received a value for this field,"\
+-                    " maybe it is not valid (yet), or the value is 0"
++                print("We have not received a value for this field,"\
++                    " maybe it is not valid (yet), or the value is 0")
+                 pass
+             else:
+                 assert(0)
+             return
+         self.check_msg_CLS(msg, Msg_FieldValue)
+-        print msg.bytes_str, "(%d)" % msg.bytes_int
++        print(msg.bytes_str, "(%d)" % msg.bytes_int)
+ 
+     def complete_print(self, text, line, start_index, end_index):
+         args = line.split()
+@@ -991,8 +1001,8 @@ class DebuggerAPI(cmd.Cmd):
+         if len(args) == 0:
+             if self.current_packet_id is None:
+                 raise UIn_Error("Cannot use this command because no packets have been observed yet")
+-            print "Packet id not specified, assuming current packet (%s)" \
+-                % self.current_packet_id_str()
++            print("Packet id not specified, assuming current packet (%s)" \
++                % self.current_packet_id_str())
+             packet_id = self.current_packet_id
+             copy_id = self.current_copy_id
+         else:
+@@ -1006,7 +1016,7 @@ class DebuggerAPI(cmd.Cmd):
+         msg = self.wait_for_msg()
+         if msg.type == MsgType.STATUS:
+             if msg.status == 1:
+-                print "Unknown packet id. Maybe it left the switch already"
++                print("Unknown packet id. Maybe it left the switch already")
+             else:
+                 assert(0)
+             return
+@@ -1016,7 +1026,7 @@ class DebuggerAPI(cmd.Cmd):
+         for ctr in ctrs:
+             type_name, obj_name = resolve_ctr(ctr)
+             bt += ["%s '%s'" % (type_name, obj_name)]
+-        print " -> ".join(bt)
++        print(" -> ".join(bt))
+ 
+     @handle_bad_input
+     def do_break_packet_in(self, line):
+@@ -1032,7 +1042,7 @@ class DebuggerAPI(cmd.Cmd):
+     def do_remove_packet_in(self, line):
+         "Remove breakpoint set by break_packet_in"
+         if not self.break_packet_in:
+-            print "Packet in breakpoint was not previously set"
++            print("Packet in breakpoint was not previously set")
+             return
+         req = Msg_RemovePacketIn(switch_id = 0, req_id = self.get_req_id())
+         self.sok.send(req.generate())
+@@ -1055,7 +1065,7 @@ class DebuggerAPI(cmd.Cmd):
+     def do_resume_packet_in(self, line):
+         "Start accepting packets into the switch again (undoes stop_packet_in)"
+         if not self.stop_packet_in:
+-            print "stop_packet_in was not being enforced"
++            print("stop_packet_in was not being enforced")
+             return
+         req = Msg_ResumePacketIn(switch_id = 0, req_id = self.get_req_id())
+         self.sok.send(req.generate())
+@@ -1163,8 +1173,8 @@ def main():
+     deprecated_args = []
+     for a in deprecated_args:
+         if getattr(args, a) is not None:
+-            print "Command line option '--{}' is deprecated".format(a),
+-            print "and will be ignored"
++            print("Command line option '--{}' is deprecated".format(a), end=' ')
++            print("and will be ignored")
+ 
+     client = None
+     socket_addr = None
+@@ -1176,18 +1186,18 @@ def main():
+         try:
+             import bmpy_utils as utils
+         except:
+-            print "When '--json' or '--socket' is not provided, the debugger needs bmpy_utils"
+-            print "bmpy_utils is not available when building bmv2 without Thrift support"
++            print("When '--json' or '--socket' is not provided, the debugger needs bmpy_utils")
++            print("bmpy_utils is not available when building bmv2 without Thrift support")
+             sys.exit(1)
+         client = utils.thrift_connect_standard(args.thrift_ip, args.thrift_port)
+         info = client.bm_mgmt_get_info()
+         if info.debugger_socket is None:
+-            print "The debugger is not enabled on the switch"
++            print("The debugger is not enabled on the switch")
+             sys.exit(1)
+         if args.socket is None:
+             socket_addr = info.debugger_socket
+-            print "'--socket' not provided, using", socket_addr,
+-            print "(obtained from switch)"
++            print("'--socket' not provided, using", socket_addr, end=' ')
++            print("(obtained from switch)")
+ 
+     json_cfg = None
+     if args.json is not None:
+@@ -1202,8 +1212,8 @@ def main():
+         if c.attached:
+             c.say_bye()
+     except Exception as e:
+-        print "Unknow error, detaching and exiting"
+-        print e
++        print("Unknow error, detaching and exiting")
++        print(e)
+         if c.attached:
+             c.say_bye()
+ 
+diff --git a/tools/runtime_CLI.py b/tools/runtime_CLI.py
+index ba74df6..536c9bb 100755
+--- a/tools/runtime_CLI.py
++++ b/tools/runtime_CLI.py
+@@ -1,5 +1,4 @@
+-#!/usr/bin/env python2
+-
++#!/usr/bin/env python
+ # Copyright 2013-present Barefoot Networks, Inc.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -20,6 +19,9 @@
+ #
+ #
+ 
++# enable prints without line break
++from __future__ import print_function
++
+ import argparse
+ import cmd
+ from collections import Counter
+@@ -30,6 +32,7 @@ import json
+ from functools import wraps
+ import bmpy_utils as utils
+ 
++
+ from bm_runtime.standard import Standard
+ from bm_runtime.standard.ttypes import *
+ try:
+@@ -41,9 +44,10 @@ try:
+ except:
+     pass
+ 
++
+ def enum(type_name, *sequential, **named):
+-    enums = dict(zip(sequential, range(len(sequential))), **named)
+-    reverse = dict((value, key) for key, value in enums.iteritems())
++    enums = dict(list(zip(sequential, list(range(len(sequential))))), **named)
++    reverse = dict((value, key) for key, value in enums.items())
+ 
+     @staticmethod
+     def to_str(x):
+@@ -57,16 +61,19 @@ def enum(type_name, *sequential, **named):
+     enums['from_str'] = from_str
+     return type(type_name, (), enums)
+ 
+-PreType = enum('PreType', 'None', 'SimplePre', 'SimplePreLAG')
++
++PreType = enum('PreType', 'none', 'SimplePre', 'SimplePreLAG')
+ MeterType = enum('MeterType', 'packets', 'bytes')
+ TableType = enum('TableType', 'simple', 'indirect', 'indirect_ws')
+ ResType = enum('ResType', 'table', 'action_prof', 'action', 'meter_array',
+                'counter_array', 'register_array', 'parse_vset')
+ 
++
+ def bytes_to_string(byte_array):
+     form = 'B' * len(byte_array)
+     return struct.pack(form, *byte_array)
+ 
++
+ def table_error_name(x):
+     return TableOperationErrorCode._VALUES_TO_NAMES[x]
+ 
+@@ -76,7 +83,8 @@ def get_parser():
+         def __init__(self, option_strings, dest, nargs=None, **kwargs):
+             if nargs is not None:
+                 raise ValueError("nargs not allowed")
+-            super(ActionToPreType, self).__init__(option_strings, dest, **kwargs)
++            super(ActionToPreType, self).__init__(
++                option_strings, dest, **kwargs)
+ 
+         def __call__(self, parser, namespace, values, option_string=None):
+             assert(type(values) is str)
+@@ -99,6 +107,7 @@ def get_parser():
+ 
+     return parser
+ 
++
+ TABLES = {}
+ ACTION_PROFS = {}
+ ACTIONS = {}
+@@ -111,6 +120,7 @@ PARSE_VSETS = {}
+ # maps (object type, unique suffix) to object
+ SUFFIX_LOOKUP_MAP = {}
+ 
++
+ class MatchType:
+     EXACT = 0
+     LPM = 1
+@@ -126,6 +136,7 @@ class MatchType:
+     def from_str(x):
+         return {"exact": 0, "lpm": 1, "ternary": 2, "valid": 3, "range": 4}[x]
+ 
++
+ class Table:
+     def __init__(self, name, id_):
+         self.name = name
+@@ -158,6 +169,7 @@ class Table:
+             return None
+         return action
+ 
++
+ class ActionProf:
+     def __init__(self, name, id_):
+         self.name = name
+@@ -178,6 +190,7 @@ class ActionProf:
+             return None
+         return action
+ 
++
+ class Action:
+     def __init__(self, name, id_):
+         self.name = name
+@@ -195,6 +208,7 @@ class Action:
+     def action_str(self):
+         return "{0:30} [{1}]".format(self.name, self.runtime_data_str())
+ 
++
+ class MeterArray:
+     def __init__(self, name, id_):
+         self.name = name
+@@ -211,6 +225,7 @@ class MeterArray:
+         return "{0:30} [{1}, {2}]".format(self.name, self.size,
+                                           MeterType.to_str(self.type_))
+ 
++
+ class CounterArray:
+     def __init__(self, name, id_):
+         self.name = name
+@@ -224,6 +239,7 @@ class CounterArray:
+     def counter_str(self):
+         return "{0:30} [{1}]".format(self.name, self.size)
+ 
++
+ class RegisterArray:
+     def __init__(self, name, id_):
+         self.name = name
+@@ -236,6 +252,7 @@ class RegisterArray:
+     def register_str(self):
+         return "{0:30} [{1}]".format(self.name, self.size)
+ 
++
+ class ParseVSet:
+     def __init__(self, name, id_):
+         self.name = name
+@@ -248,6 +265,7 @@ class ParseVSet:
+         return "{0:30} [compressed bitwidth:{1}]".format(
+             self.name, self.bitwidth)
+ 
++
+ def reset_config():
+     TABLES.clear()
+     ACTION_PROFS.clear()
+@@ -270,7 +288,8 @@ def load_json_str(json_str, architecture_spec=None):
+ 
+     def get_field_bitwidth(header_type, field_name, j_header_types):
+         for h in j_header_types:
+-            if h["name"] != header_type: continue
++            if h["name"] != header_type:
++                continue
+             for t in h["fields"]:
+                 # t can have a third element (field signedness)
+                 f, bw = t[0], t[1]
+@@ -395,6 +414,7 @@ def load_json_str(json_str, architecture_spec=None):
+         if c > 1:
+             del SUFFIX_LOOKUP_MAP[key]
+ 
++
+ class UIn_Error(Exception):
+     def __init__(self, info=""):
+         self.info = info
+@@ -402,6 +422,7 @@ class UIn_Error(Exception):
+     def __str__(self):
+         return self.info
+ 
++
+ class UIn_ResourceError(UIn_Error):
+     def __init__(self, res_type, name):
+         self.res_type = res_type
+@@ -410,6 +431,7 @@ class UIn_ResourceError(UIn_Error):
+     def __str__(self):
+         return "Invalid %s name (%s)" % (self.res_type, self.name)
+ 
++
+ class UIn_MatchKeyError(UIn_Error):
+     def __init__(self, info=""):
+         self.info = info
+@@ -417,6 +439,7 @@ class UIn_MatchKeyError(UIn_Error):
+     def __str__(self):
+         return self.info
+ 
++
+ class UIn_RuntimeDataError(UIn_Error):
+     def __init__(self, info=""):
+         self.info = info
+@@ -424,10 +447,12 @@ class UIn_RuntimeDataError(UIn_Error):
+     def __str__(self):
+         return self.info
+ 
++
+ class CLI_FormatExploreError(Exception):
+     def __init__(self):
+         pass
+ 
++
+ class UIn_BadParamError(UIn_Error):
+     def __init__(self, info=""):
+         self.info = info
+@@ -435,18 +460,22 @@ class UIn_BadParamError(UIn_Error):
+     def __str__(self):
+         return self.info
+ 
++
+ class UIn_BadIPv4Error(UIn_Error):
+     def __init__(self):
+         pass
+ 
++
+ class UIn_BadIPv6Error(UIn_Error):
+     def __init__(self):
+         pass
+ 
++
+ class UIn_BadMacError(UIn_Error):
+     def __init__(self):
+         pass
+ 
++
+ def ipv4Addr_to_bytes(addr):
+     if not '.' in addr:
+         raise CLI_FormatExploreError()
+@@ -458,6 +487,7 @@ def ipv4Addr_to_bytes(addr):
+     except:
+         raise UIn_BadIPv4Error()
+ 
++
+ def macAddr_to_bytes(addr):
+     if not ':' in addr:
+         raise CLI_FormatExploreError()
+@@ -469,6 +499,7 @@ def macAddr_to_bytes(addr):
+     except:
+         raise UIn_BadMacError()
+ 
++
+ def ipv6Addr_to_bytes(addr):
+     from ipaddr import IPv6Address
+     if not ':' in addr:
+@@ -482,11 +513,12 @@ def ipv6Addr_to_bytes(addr):
+     except:
+         raise UIn_BadIPv6Error()
+ 
++
+ def int_to_bytes(i, num):
+     byte_array = []
+     while i > 0:
+         byte_array.append(i % 256)
+-        i = i / 256
++        i = i // 256
+         num -= 1
+     if num < 0:
+         raise UIn_BadParamError("Parameter is too large")
+@@ -496,6 +528,7 @@ def int_to_bytes(i, num):
+     byte_array.reverse()
+     return byte_array
+ 
++
+ def parse_param(input_str, bitwidth):
+     if bitwidth == 32:
+         try:
+@@ -525,10 +558,11 @@ def parse_param(input_str, bitwidth):
+             "Invalid input, could not cast to integer, try in hex with 0x prefix"
+         )
+     try:
+-        return int_to_bytes(input_, (bitwidth + 7) / 8)
++        return int_to_bytes(input_, (bitwidth + 7) // 8)
+     except UIn_BadParamError:
+         raise
+ 
++
+ def parse_runtime_data(action, params):
+     def parse_param_(field, bw):
+         try:
+@@ -538,18 +572,19 @@ def parse_runtime_data(action, params):
+                 "Error while parsing %s - %s" % (field, e)
+             )
+ 
+-    bitwidths = [bw for( _, bw) in action.runtime_data]
++    bitwidths = [bw for(_, bw) in action.runtime_data]
+     byte_array = []
+     for input_str, bitwidth in zip(params, bitwidths):
+         byte_array += [bytes_to_string(parse_param_(input_str, bitwidth))]
+     return byte_array
+ 
++
+ _match_types_mapping = {
+-    MatchType.EXACT : BmMatchParamType.EXACT,
+-    MatchType.LPM : BmMatchParamType.LPM,
+-    MatchType.TERNARY : BmMatchParamType.TERNARY,
+-    MatchType.VALID : BmMatchParamType.VALID,
+-    MatchType.RANGE : BmMatchParamType.RANGE,
++    MatchType.EXACT: BmMatchParamType.EXACT,
++    MatchType.LPM: BmMatchParamType.LPM,
++    MatchType.TERNARY: BmMatchParamType.TERNARY,
++    MatchType.VALID: BmMatchParamType.VALID,
++    MatchType.RANGE: BmMatchParamType.RANGE,
+ }
+ 
+ def parse_match_key(table, key_fields):
+@@ -570,8 +605,8 @@ def parse_match_key(table, key_fields):
+         bw = bitwidths[idx]
+         if param_type == BmMatchParamType.EXACT:
+             key = bytes_to_string(parse_param_(field, bw))
+-            param = BmMatchParam(type = param_type,
+-                                 exact = BmMatchParamExact(key))
++            param = BmMatchParam(type=param_type,
++                                 exact=BmMatchParamExact(key))
+         elif param_type == BmMatchParamType.LPM:
+             try:
+                 prefix, length = field.split("/")
+@@ -580,8 +615,8 @@ def parse_match_key(table, key_fields):
+                     "Invalid LPM value {}, use '/' to separate prefix "
+                     "and length".format(field))
+             key = bytes_to_string(parse_param_(prefix, bw))
+-            param = BmMatchParam(type = param_type,
+-                                 lpm = BmMatchParamLPM(key, int(length)))
++            param = BmMatchParam(type=param_type,
++                                 lpm=BmMatchParamLPM(key, int(length)))
+         elif param_type == BmMatchParamType.TERNARY:
+             try:
+                 key, mask = field.split("&&&")
+@@ -595,12 +630,12 @@ def parse_match_key(table, key_fields):
+                 raise UIn_MatchKeyError(
+                     "Key and mask have different lengths in expression %s" % field
+                 )
+-            param = BmMatchParam(type = param_type,
+-                                 ternary = BmMatchParamTernary(key, mask))
++            param = BmMatchParam(type=param_type,
++                                 ternary=BmMatchParamTernary(key, mask))
+         elif param_type == BmMatchParamType.VALID:
+             key = bool(int(field))
+-            param = BmMatchParam(type = param_type,
+-                                 valid = BmMatchParamValid(key))
++            param = BmMatchParam(type=param_type,
++                                 valid=BmMatchParamValid(key))
+         elif param_type == BmMatchParamType.RANGE:
+             try:
+                 start, end = field.split("->")
+@@ -618,15 +653,20 @@ def parse_match_key(table, key_fields):
+                 raise UIn_MatchKeyError(
+                     "start is less than end in expression %s" % field
+                 )
+-            param = BmMatchParam(type = param_type,
+-                                 range = BmMatchParamRange(start, end))
++            param = BmMatchParam(type=param_type,
++                                 range=BmMatchParamRange(start, end))
+         else:
+             assert(0)
+         params.append(param)
+     return params
+ 
++
+ def printable_byte_str(s):
+-    return ":".join("{:02x}".format(ord(c)) for c in s)
++    if sys.version_info >= (3, 0):
++        # different byte processing in Python 3
++        return ":".join([format(c, "02x") for c in s])
++    return "".join("{:02x}".format(ord(c)) for c in s)
++
+ 
+ def BmMatchParam_to_str(self):
+     return BmMatchParamType._VALUES_TO_NAMES[self.type] + "-" +\
+@@ -636,21 +676,27 @@ def BmMatchParam_to_str(self):
+         (self.valid.to_str() if self.valid else "") +\
+         (self.range.to_str() if self.range else "")
+ 
++
+ def BmMatchParamExact_to_str(self):
+     return printable_byte_str(self.key)
+ 
++
+ def BmMatchParamLPM_to_str(self):
+     return printable_byte_str(self.key) + "/" + str(self.prefix_length)
+ 
++
+ def BmMatchParamTernary_to_str(self):
+     return printable_byte_str(self.key) + " &&& " + printable_byte_str(self.mask)
+ 
++
+ def BmMatchParamValid_to_str(self):
+     return ""
+ 
++
+ def BmMatchParamRange_to_str(self):
+     return printable_byte_str(self.start) + " -> " + printable_byte_str(self.end_)
+ 
++
+ BmMatchParam.to_str = BmMatchParam_to_str
+ BmMatchParamExact.to_str = BmMatchParamExact_to_str
+ BmMatchParamLPM.to_str = BmMatchParamLPM_to_str
+@@ -658,6 +704,7 @@ BmMatchParamTernary.to_str = BmMatchParamTernary_to_str
+ BmMatchParamValid.to_str = BmMatchParamValid_to_str
+ BmMatchParamRange.to_str = BmMatchParamRange_to_str
+ 
++
+ def parse_pvs_value(input_str, bitwidth):
+     try:
+         input_ = int(input_str, 0)
+@@ -680,70 +727,75 @@ def parse_pvs_value(input_str, bitwidth):
+     return bytes_to_string(v)
+ 
+ # services is [(service_name, client_class), ...]
++
++
+ def thrift_connect(thrift_ip, thrift_port, services):
+     return utils.thrift_connect(thrift_ip, thrift_port, services)
+ 
++
+ def handle_bad_input(f):
+     @wraps(f)
+     def handle(*args, **kwargs):
+         try:
+             return f(*args, **kwargs)
+         except UIn_MatchKeyError as e:
+-            print "Invalid match key:", e
++            print("Invalid match key:", e)
+         except UIn_RuntimeDataError as e:
+-            print "Invalid runtime data:", e
++            print("Invalid runtime data:", e)
+         except UIn_Error as e:
+-            print "Error:", e
++            print("Error:", e)
+         except InvalidTableOperation as e:
+             error = TableOperationErrorCode._VALUES_TO_NAMES[e.code]
+-            print "Invalid table operation ({})".format(error)
++            print("Invalid table operation ({})".format(error))
+         except InvalidCounterOperation as e:
+             error = CounterOperationErrorCode._VALUES_TO_NAMES[e.code]
+-            print "Invalid counter operation ({})".format(error)
++            print("Invalid counter operation ({})".format(error))
+         except InvalidMeterOperation as e:
+             error = MeterOperationErrorCode._VALUES_TO_NAMES[e.code]
+-            print "Invalid meter operation ({})".format(error)
++            print("Invalid meter operation ({})".format(error))
+         except InvalidRegisterOperation as e:
+             error = RegisterOperationErrorCode._VALUES_TO_NAMES[e.code]
+-            print "Invalid register operation ({})".format(error)
++            print("Invalid register operation ({})".format(error))
+         except InvalidLearnOperation as e:
+             error = LearnOperationErrorCode._VALUES_TO_NAMES[e.code]
+-            print "Invalid learn operation ({})".format(error)
++            print("Invalid learn operation ({})".format(error))
+         except InvalidSwapOperation as e:
+             error = SwapOperationErrorCode._VALUES_TO_NAMES[e.code]
+-            print "Invalid swap operation ({})".format(error)
++            print("Invalid swap operation ({})".format(error))
+         except InvalidDevMgrOperation as e:
+             error = DevMgrErrorCode._VALUES_TO_NAMES[e.code]
+-            print "Invalid device manager operation ({})".format(error)
++            print("Invalid device manager operation ({})".format(error))
+         except InvalidCrcOperation as e:
+             error = CrcErrorCode._VALUES_TO_NAMES[e.code]
+-            print "Invalid crc operation ({})".format(error)
++            print("Invalid crc operation ({})".format(error))
+         except InvalidParseVSetOperation as e:
+             error = ParseVSetOperationErrorCode._VALUES_TO_NAMES[e.code]
+-            print "Invalid parser value set operation ({})".format(error)
++            print("Invalid parser value set operation ({})".format(error))
+     return handle
+ 
++
+ def handle_bad_input_mc(f):
+     @wraps(f)
+     def handle(*args, **kwargs):
+         pre_type = args[0].pre_type
+-        if pre_type == PreType.None:
++        if pre_type == PreType.none:
+             return handle_bad_input(f)(*args, **kwargs)
+         EType = {
+-            PreType.SimplePre : SimplePre.InvalidMcOperation,
+-            PreType.SimplePreLAG : SimplePreLAG.InvalidMcOperation
++            PreType.SimplePre: SimplePre.InvalidMcOperation,
++            PreType.SimplePreLAG: SimplePreLAG.InvalidMcOperation
+         }[pre_type]
+         Codes = {
+-            PreType.SimplePre : SimplePre.McOperationErrorCode,
+-            PreType.SimplePreLAG : SimplePreLAG.McOperationErrorCode
++            PreType.SimplePre: SimplePre.McOperationErrorCode,
++            PreType.SimplePreLAG: SimplePreLAG.McOperationErrorCode
+         }[pre_type]
+         try:
+             return handle_bad_input(f)(*args, **kwargs)
+         except EType as e:
+             error = Codes._VALUES_TO_NAMES[e.code]
+-            print "Invalid PRE operation (%s)" % error
++            print("Invalid PRE operation (%s)" % error)
+     return handle
+ 
++
+ def deprecated_act_prof(substitute, with_selection=False,
+                         strictly_deprecated=True):
+     # need two levels here because our decorator takes arguments
+@@ -753,6 +805,7 @@ def deprecated_act_prof(substitute, with_selection=False,
+         if strictly_deprecated:
+             f.__doc__ = "[DEPRECATED!] " + f.__doc__
+             f.__doc__ += "\nUse '{}' instead".format(substitute)
++
+         @wraps(f)
+         def wrapper(obj, line):
+             substitute_fn = getattr(obj, "do_" + substitute)
+@@ -781,31 +834,44 @@ def deprecated_act_prof(substitute, with_selection=False,
+     return deprecated_act_prof_
+ 
+ # thrift does not support unsigned integers
++
++
+ def hex_to_i16(h):
+     x = int(h, 0)
+     if (x > 0xFFFF):
+         raise UIn_Error("Integer cannot fit within 16 bits")
+-    if (x > 0x7FFF): x-= 0x10000
++    if (x > 0x7FFF):
++        x -= 0x10000
+     return x
++
++
+ def i16_to_hex(h):
+     x = int(h)
+-    if (x & 0x8000): x+= 0x10000
++    if (x & 0x8000):
++        x += 0x10000
+     return x
++
++
+ def hex_to_i32(h):
+     x = int(h, 0)
+     if (x > 0xFFFFFFFF):
+         raise UIn_Error("Integer cannot fit within 32 bits")
+-    if (x > 0x7FFFFFFF): x-= 0x100000000
++    if (x > 0x7FFFFFFF):
++        x -= 0x100000000
+     return x
++
++
+ def i32_to_hex(h):
+     x = int(h)
+-    if (x & 0x80000000): x+= 0x100000000
++    if (x & 0x80000000):
++        x += 0x100000000
+     return x
+ 
++
+ def parse_bool(s):
+     if s == "true" or s == "True":
+         return True
+-    if s == "false" or s  == "False":
++    if s == "false" or s == "False":
+         return False
+     try:
+         s = int(s, 0)
+@@ -814,9 +880,14 @@ def parse_bool(s):
+         pass
+     raise UIn_Error("Invalid bool parameter")
+ 
++
+ def hexstr(v):
++    if sys.version_info >= (3, 0):
++        # different byte processing in Python 3
++        return "".join([format(c, "02x") for c in v])
+     return "".join("{:02x}".format(ord(c)) for c in v)
+ 
++
+ class RuntimeAPI(cmd.Cmd):
+     prompt = 'RuntimeCmd: '
+     intro = "Control utility for runtime P4 table manipulation"
+@@ -841,16 +912,16 @@ class RuntimeAPI(cmd.Cmd):
+         self.pre_type = pre_type
+ 
+     def do_greet(self, line):
+-        print "hello"
++        print("hello")
+ 
+     def do_EOF(self, line):
+-        print
++        print()
+         return True
+ 
+     def do_shell(self, line):
+         "Run a shell command"
+         output = os.popen(line).read()
+-        print output
++        print(output)
+ 
+     def get_res(self, type_name, name, res_type):
+         key = res_type, name
+@@ -885,14 +956,14 @@ class RuntimeAPI(cmd.Cmd):
+         "List tables defined in the P4 program: show_tables"
+         self.exactly_n_args(line.split(), 0)
+         for table_name in sorted(TABLES):
+-            print TABLES[table_name].table_str()
++            print(TABLES[table_name].table_str())
+ 
+     @handle_bad_input
+     def do_show_actions(self, line):
+         "List actions defined in the P4 program: show_actions"
+         self.exactly_n_args(line.split(), 0)
+         for action_name in sorted(ACTIONS):
+-            print ACTIONS[action_name].action_str()
++            print(ACTIONS[action_name].action_str())
+ 
+     def _complete_tables(self, text):
+         return self._complete_res(TABLES, text)
+@@ -908,7 +979,7 @@ class RuntimeAPI(cmd.Cmd):
+         table_name = args[0]
+         table = self.get_res("table", table_name, ResType.table)
+         for action_name in sorted(table.actions):
+-            print ACTIONS[action_name].action_str()
++            print(ACTIONS[action_name].action_str())
+ 
+     def complete_table_show_actions(self, text, line, start_index, end_index):
+         return self._complete_tables(text)
+@@ -920,16 +991,16 @@ class RuntimeAPI(cmd.Cmd):
+         self.exactly_n_args(args, 1)
+         table_name = args[0]
+         table = self.get_res("table", table_name, ResType.table)
+-        print table.table_str()
+-        print "*" * 80
++        print(table.table_str())
++        print("*" * 80)
+         for action_name in sorted(table.actions):
+-            print ACTIONS[action_name].action_str()
++            print(ACTIONS[action_name].action_str())
+ 
+     def complete_table_info(self, text, line, start_index, end_index):
+         return self._complete_tables(text)
+ 
+     # used for tables but also for action profiles
+-    def _complete_actions(self, text, table_name = None, res = TABLES):
++    def _complete_actions(self, text, table_name=None, res=TABLES):
+         if not table_name:
+             actions = sorted(ACTIONS.keys())
+         elif table_name not in res:
+@@ -971,12 +1042,12 @@ class RuntimeAPI(cmd.Cmd):
+ 
+     # for debugging
+     def print_set_default(self, table_name, action_name, runtime_data):
+-        print "Setting default action of", table_name
+-        print "{0:20} {1}".format("action:", action_name)
+-        print "{0:20} {1}".format(
++        print("Setting default action of", table_name)
++        print("{0:20} {1}".format("action:", action_name))
++        print("{0:20} {1}".format(
+             "runtime data:",
+             "\t".join(printable_byte_str(d) for d in runtime_data)
+-        )
++        ))
+ 
+     @handle_bad_input
+     def do_table_set_default(self, line):
+@@ -995,14 +1066,16 @@ class RuntimeAPI(cmd.Cmd):
+             )
+         if len(args[2:]) != action.num_params():
+             raise UIn_Error(
+-                "Action %s needs %d parameters" % (action_name, action.num_params())
++                "Action %s needs %d parameters" % (
++                    action_name, action.num_params())
+             )
+ 
+         runtime_data = parse_runtime_data(action, args[2:])
+ 
+         self.print_set_default(table_name, action_name, runtime_data)
+ 
+-        self.client.bm_mt_set_default_action(0, table.name, action.name, runtime_data)
++        self.client.bm_mt_set_default_action(
++            0, table.name, action.name, runtime_data)
+ 
+     def complete_table_set_default(self, text, line, start_index, end_index):
+         return self._complete_table_and_action(text, line)
+@@ -1026,22 +1099,23 @@ class RuntimeAPI(cmd.Cmd):
+     def parse_runtime_data(self, action, action_params):
+         if len(action_params) != action.num_params():
+             raise UIn_Error(
+-                "Action %s needs %d parameters" % (action.name, action.num_params())
++                "Action %s needs %d parameters" % (
++                    action.name, action.num_params())
+             )
+ 
+         return parse_runtime_data(action, action_params)
+ 
+     # for debugging
+     def print_table_add(self, match_key, action_name, runtime_data):
+-        print "{0:20} {1}".format(
++        print("{0:20} {1}".format(
+             "match key:",
+             "\t".join(d.to_str() for d in match_key)
+-        )
+-        print "{0:20} {1}".format("action:", action_name)
+-        print "{0:20} {1}".format(
++        ))
++        print("{0:20} {1}".format("action:", action_name))
++        print("{0:20} {1}".format(
+             "runtime data:",
+             "\t".join(printable_byte_str(d) for d in runtime_data)
+-        )
++        ))
+ 
+     @handle_bad_input
+     def do_table_num_entries(self, line):
+@@ -1053,7 +1127,7 @@ class RuntimeAPI(cmd.Cmd):
+         table_name = args[0]
+         table = self.get_res("table", table_name, ResType.table)
+ 
+-        print self.client.bm_mt_get_num_entries(0, table.name)
++        print(self.client.bm_mt_get_num_entries(0, table.name))
+ 
+     def complete_table_num_entries(self, text, line, start_index, end_index):
+         return self._complete_tables(text)
+@@ -1099,30 +1173,33 @@ class RuntimeAPI(cmd.Cmd):
+             priority = 0
+ 
+         for idx, input_ in enumerate(args[2:]):
+-            if input_ == "=>": break
++            if input_ == "=>":
++                break
+         idx += 2
+         match_key = args[2:idx]
+-        action_params = args[idx+1:]
++        action_params = args[idx + 1:]
+         if len(match_key) != table.num_key_fields():
+             raise UIn_Error(
+-                "Table %s needs %d key fields" % (table_name, table.num_key_fields())
++                "Table %s needs %d key fields" % (
++                    table_name, table.num_key_fields())
+             )
+ 
+         runtime_data = self.parse_runtime_data(action, action_params)
+ 
+         match_key = parse_match_key(table, match_key)
+ 
+-        print "Adding entry to", MatchType.to_str(table.match_type), "match table", table_name
++        print("Adding entry to", MatchType.to_str(
++            table.match_type), "match table", table_name)
+ 
+         # disable, maybe a verbose CLI option?
+         self.print_table_add(match_key, action_name, runtime_data)
+ 
+         entry_handle = self.client.bm_mt_add_entry(
+             0, table.name, match_key, action.name, runtime_data,
+-            BmAddEntryOptions(priority = priority)
++            BmAddEntryOptions(priority=priority)
+         )
+ 
+-        print "Entry has been added with handle", entry_handle
++        print("Entry has been added with handle", entry_handle)
+ 
+     def complete_table_add(self, text, line, start_index, end_index):
+         return self._complete_table_and_action(text, line)
+@@ -1149,9 +1226,10 @@ class RuntimeAPI(cmd.Cmd):
+         except:
+             raise UIn_Error("Bad format for timeout")
+ 
+-        print "Setting a", timeout_ms, "ms timeout for entry", entry_handle
++        print("Setting a", timeout_ms, "ms timeout for entry", entry_handle)
+ 
+-        self.client.bm_mt_set_entry_ttl(0, table.name, entry_handle, timeout_ms)
++        self.client.bm_mt_set_entry_ttl(
++            0, table.name, entry_handle, timeout_ms)
+ 
+     def complete_table_set_timeout(self, text, line, start_index, end_index):
+         return self._complete_tables(text)
+@@ -1182,7 +1260,8 @@ class RuntimeAPI(cmd.Cmd):
+             action_params = args[4:]
+         runtime_data = self.parse_runtime_data(action, action_params)
+ 
+-        print "Modifying entry", entry_handle, "for", MatchType.to_str(table.match_type), "match table", table_name
++        print("Modifying entry", entry_handle, "for", MatchType.to_str(
++            table.match_type), "match table", table_name)
+ 
+         entry_handle = self.client.bm_mt_modify_entry(
+             0, table.name, entry_handle, action.name, runtime_data
+@@ -1206,7 +1285,7 @@ class RuntimeAPI(cmd.Cmd):
+         except:
+             raise UIn_Error("Bad format for entry handle")
+ 
+-        print "Deleting entry", entry_handle, "from", table_name
++        print("Deleting entry", entry_handle, "from", table_name)
+ 
+         self.client.bm_mt_delete_entry(0, table.name, entry_handle)
+ 
+@@ -1220,7 +1299,7 @@ class RuntimeAPI(cmd.Cmd):
+     def check_indirect_ws(self, table):
+         if table.type_ != TableType.indirect_ws:
+             raise UIn_Error(
+-                "Cannot run this command on non-indirect table,"\
++                "Cannot run this command on non-indirect table,"
+                 " or on indirect table with no selector")
+ 
+     def check_act_prof_ws(self, act_prof):
+@@ -1250,7 +1329,7 @@ class RuntimeAPI(cmd.Cmd):
+         mbr_handle = self.client.bm_mt_act_prof_add_member(
+             0, act_prof.name, action.name, runtime_data)
+ 
+-        print "Member has been created with handle", mbr_handle
++        print("Member has been created with handle", mbr_handle)
+ 
+     def complete_act_prof_create_member(self, text, line, start_index, end_index):
+         return self._complete_act_prof_and_action(text, line)
+@@ -1357,12 +1436,13 @@ class RuntimeAPI(cmd.Cmd):
+             priority = 0
+ 
+         for idx, input_ in enumerate(args[1:]):
+-            if input_ == "=>": break
++            if input_ == "=>":
++                break
+         idx += 1
+         match_key = args[1:idx]
+         if len(args) != (idx + 2):
+             raise UIn_Error("Invalid arguments, could not find handle")
+-        handle = args[idx+1]
++        handle = args[idx + 1]
+ 
+         try:
+             handle = int(handle)
+@@ -1371,9 +1451,9 @@ class RuntimeAPI(cmd.Cmd):
+ 
+         match_key = parse_match_key(table, match_key)
+ 
+-        print "Adding entry to indirect match table", table.name
++        print("Adding entry to indirect match table", table.name)
+ 
+-        return table.name, match_key, handle, BmAddEntryOptions(priority = priority)
++        return table.name, match_key, handle, BmAddEntryOptions(priority=priority)
+ 
+     @handle_bad_input
+     def do_table_indirect_add(self, line):
+@@ -1385,7 +1465,7 @@ class RuntimeAPI(cmd.Cmd):
+             0, table_name, match_key, handle, options
+         )
+ 
+-        print "Entry has been added with handle", entry_handle
++        print("Entry has been added with handle", entry_handle)
+ 
+     def complete_table_indirect_add(self, text, line, start_index, end_index):
+         return self._complete_tables(text)
+@@ -1394,13 +1474,14 @@ class RuntimeAPI(cmd.Cmd):
+     def do_table_indirect_add_with_group(self, line):
+         "Add entry to an indirect match table: table_indirect_add <table name> <match fields> => <group handle> [priority]"
+ 
+-        table_name, match_key, handle, options = self.indirect_add_common(line, ws=True)
++        table_name, match_key, handle, options = self.indirect_add_common(
++            line, ws=True)
+ 
+         entry_handle = self.client.bm_mt_indirect_ws_add_entry(
+             0, table_name, match_key, handle, options
+         )
+ 
+-        print "Entry has been added with handle", entry_handle
++        print("Entry has been added with handle", entry_handle)
+ 
+     def complete_table_indirect_add_with_group(self, text, line, start_index, end_index):
+         return self._complete_tables(text)
+@@ -1421,7 +1502,7 @@ class RuntimeAPI(cmd.Cmd):
+         except:
+             raise UIn_Error("Bad format for entry handle")
+ 
+-        print "Deleting entry", entry_handle, "from", table_name
++        print("Deleting entry", entry_handle, "from", table_name)
+ 
+         self.client.bm_mt_indirect_delete_entry(0, table.name, entry_handle)
+ 
+@@ -1501,7 +1582,7 @@ class RuntimeAPI(cmd.Cmd):
+ 
+         grp_handle = self.client.bm_mt_act_prof_create_group(0, act_prof.name)
+ 
+-        print "Group has been created with handle", grp_handle
++        print("Group has been created with handle", grp_handle)
+ 
+     def complete_act_prof_create_group(self, text, line, start_index, end_index):
+         return self._complete_act_profs(text)
+@@ -1619,9 +1700,8 @@ class RuntimeAPI(cmd.Cmd):
+     def complete_table_indirect_remove_member_from_group(self, text, line, start_index, end_index):
+         return self._complete_tables(text)
+ 
+-
+     def check_has_pre(self):
+-        if self.pre_type == PreType.None:
++        if self.pre_type == PreType.none:
+             raise UIn_Error(
+                 "Cannot execute this command without packet replication engine"
+             )
+@@ -1639,7 +1719,7 @@ class RuntimeAPI(cmd.Cmd):
+         args = line.split()
+         self.exactly_n_args(args, 1)
+         mgrp = self.get_mgrp(args[0])
+-        print "Creating multicast group", mgrp
++        print("Creating multicast group", mgrp)
+         mgrp_hdl = self.mc_client.bm_mc_mgrp_create(0, mgrp)
+         assert(mgrp == mgrp_hdl)
+ 
+@@ -1650,7 +1730,7 @@ class RuntimeAPI(cmd.Cmd):
+         args = line.split()
+         self.exactly_n_args(args, 1)
+         mgrp = self.get_mgrp(args[0])
+-        print "Destroying multicast group", mgrp
++        print("Destroying multicast group", mgrp)
+         self.mc_client.bm_mc_mgrp_destroy(0, mgrp)
+ 
+     def ports_to_port_map_str(self, ports, description="port"):
+@@ -1703,12 +1783,15 @@ class RuntimeAPI(cmd.Cmd):
+             raise UIn_Error("Bad format for rid")
+         port_map_str, lag_map_str = self.parse_ports_and_lags(args)
+         if self.pre_type == PreType.SimplePre:
+-            print "Creating node with rid", rid, "and with port map", port_map_str
++            print("Creating node with rid", rid,
++                  "and with port map", port_map_str)
+             l1_hdl = self.mc_client.bm_mc_node_create(0, rid, port_map_str)
+         else:
+-            print "Creating node with rid", rid, ", port map", port_map_str, "and lag map", lag_map_str
+-            l1_hdl = self.mc_client.bm_mc_node_create(0, rid, port_map_str, lag_map_str)
+-        print "node was created with handle", l1_hdl
++            print("Creating node with rid", rid, ", port map",
++                  port_map_str, "and lag map", lag_map_str)
++            l1_hdl = self.mc_client.bm_mc_node_create(
++                0, rid, port_map_str, lag_map_str)
++        print("node was created with handle", l1_hdl)
+ 
+     def get_node_handle(self, s):
+         try:
+@@ -1725,11 +1808,13 @@ class RuntimeAPI(cmd.Cmd):
+         l1_hdl = self.get_node_handle(args[0])
+         port_map_str, lag_map_str = self.parse_ports_and_lags(args)
+         if self.pre_type == PreType.SimplePre:
+-            print "Updating node", l1_hdl, "with port map", port_map_str
++            print("Updating node", l1_hdl, "with port map", port_map_str)
+             self.mc_client.bm_mc_node_update(0, l1_hdl, port_map_str)
+         else:
+-            print "Updating node", l1_hdl, "with port map", port_map_str, "and lag map", lag_map_str
+-            self.mc_client.bm_mc_node_update(0, l1_hdl, port_map_str, lag_map_str)
++            print("Updating node", l1_hdl, "with port map",
++                  port_map_str, "and lag map", lag_map_str)
++            self.mc_client.bm_mc_node_update(
++                0, l1_hdl, port_map_str, lag_map_str)
+ 
+     @handle_bad_input_mc
+     def do_mc_node_associate(self, line):
+@@ -1739,7 +1824,7 @@ class RuntimeAPI(cmd.Cmd):
+         self.exactly_n_args(args, 2)
+         mgrp = self.get_mgrp(args[0])
+         l1_hdl = self.get_node_handle(args[1])
+-        print "Associating node", l1_hdl, "to multicast group", mgrp
++        print("Associating node", l1_hdl, "to multicast group", mgrp)
+         self.mc_client.bm_mc_node_associate(0, mgrp, l1_hdl)
+ 
+     @handle_bad_input_mc
+@@ -1750,7 +1835,7 @@ class RuntimeAPI(cmd.Cmd):
+         self.exactly_n_args(args, 2)
+         mgrp = self.get_mgrp(args[0])
+         l1_hdl = self.get_node_handle(args[1])
+-        print "Dissociating node", l1_hdl, "from multicast group", mgrp
++        print("Dissociating node", l1_hdl, "from multicast group", mgrp)
+         self.mc_client.bm_mc_node_dissociate(0, mgrp, l1_hdl)
+ 
+     @handle_bad_input_mc
+@@ -1760,7 +1845,7 @@ class RuntimeAPI(cmd.Cmd):
+         args = line.split()
+         self.exactly_n_args(args, 1)
+         l1_hdl = int(line.split()[0])
+-        print "Destroying node", l1_hdl
++        print("Destroying node", l1_hdl)
+         self.mc_client.bm_mc_node_destroy(0, l1_hdl)
+ 
+     @handle_bad_input_mc
+@@ -1769,7 +1854,7 @@ class RuntimeAPI(cmd.Cmd):
+         self.check_has_pre()
+         if self.pre_type != PreType.SimplePreLAG:
+             raise UIn_Error(
+-                "Cannot execute this command with this type of PRE,"\
++                "Cannot execute this command with this type of PRE,"
+                 " SimplePreLAG is required"
+             )
+         args = line.split()
+@@ -1779,7 +1864,7 @@ class RuntimeAPI(cmd.Cmd):
+         except:
+             raise UIn_Error("Bad format for lag index")
+         port_map_str = self.ports_to_port_map_str(args[1:], description="lag")
+-        print "Setting lag membership:", lag_index, "<-", port_map_str
++        print("Setting lag membership:", lag_index, "<-", port_map_str)
+         self.mc_client.bm_mc_set_lag_membership(0, lag_index, port_map_str)
+ 
+     @handle_bad_input_mc
+@@ -1790,7 +1875,7 @@ class RuntimeAPI(cmd.Cmd):
+         try:
+             mc_json = json.loads(json_dump)
+         except:
+-            print "Exception when retrieving MC entries"
++            print("Exception when retrieving MC entries")
+             return
+ 
+         l1_handles = {}
+@@ -1800,29 +1885,30 @@ class RuntimeAPI(cmd.Cmd):
+         for h in mc_json["l2_handles"]:
+             l2_handles[h["handle"]] = (h["ports"], h["lags"])
+ 
+-        print "=========="
+-        print "MC ENTRIES"
++        print("==========")
++        print("MC ENTRIES")
+         for mgrp in mc_json["mgrps"]:
+-            print "**********"
++            print("**********")
+             mgid = mgrp["id"]
+-            print "mgrp({})".format(mgid)
++            print("mgrp({})".format(mgid))
+             for L1h in mgrp["l1_handles"]:
+                 rid, L2h = l1_handles[L1h]
+-                print "  -> (L1h={}, rid={})".format(L1h, rid),
++                print("  -> (L1h={}, rid={})".format(L1h, rid), end=' ')
+                 ports, lags = l2_handles[L2h]
+-                print "-> (ports=[{}], lags=[{}])".format(
++                print("-> (ports=[{}], lags=[{}])".format(
+                     ", ".join([str(p) for p in ports]),
+-                    ", ".join([str(l) for l in lags]))
++                    ", ".join([str(l) for l in lags])))
+ 
+-        print "=========="
+-        print "LAGS"
++        print("==========")
++        print("LAGS")
+         if "lags" in mc_json:
+             for lag in mc_json["lags"]:
+-                print "lag({})".format(lag["id"]),
+-                print "-> ports=[{}]".format(", ".join([str(p) for p in ports]))
++                print("lag({})".format(lag["id"]), end=' ')
++                print("-> ports=[{}]".format(", ".join([str(p)
++                                                        for p in ports])))
+         else:
+-            print "None for this PRE type"
+-        print "=========="
++            print("None for this PRE type")
++        print("==========")
+ 
+     @handle_bad_input
+     def do_load_new_config_file(self, line):
+@@ -1832,7 +1918,7 @@ class RuntimeAPI(cmd.Cmd):
+         filename = args[0]
+         if not os.path.isfile(filename):
+             raise UIn_Error("Not a valid filename")
+-        print "Loading new Json config"
++        print("Loading new Json config")
+         with open(filename, 'r') as f:
+             json_str = f.read()
+             try:
+@@ -1845,7 +1931,7 @@ class RuntimeAPI(cmd.Cmd):
+     @handle_bad_input
+     def do_swap_configs(self, line):
+         "Swap the 2 existing configs, need to have called load_new_config_file before"
+-        print "Swapping configs"
++        print("Swapping configs")
+         self.client.bm_swap_configs()
+ 
+     @handle_bad_input
+@@ -1858,7 +1944,7 @@ class RuntimeAPI(cmd.Cmd):
+         rates = args[1:]
+         if len(rates) != meter.rate_count:
+             raise UIn_Error(
+-                "Invalid number of rates, expected %d but got %d"\
++                "Invalid number of rates, expected %d but got %d"
+                 % (meter.rate_count, len(rates))
+             )
+         new_rates = []
+@@ -1889,7 +1975,7 @@ class RuntimeAPI(cmd.Cmd):
+         rates = args[2:]
+         if len(rates) != meter.rate_count:
+             raise UIn_Error(
+-                "Invalid number of rates, expected %d but got %d"\
++                "Invalid number of rates, expected %d but got %d"
+                 % (meter.rate_count, len(rates))
+             )
+         new_rates = []
+@@ -1928,11 +2014,11 @@ class RuntimeAPI(cmd.Cmd):
+         else:
+             rates = self.client.bm_meter_get_rates(0, meter.name, index)
+         if len(rates) != meter.rate_count:
+-            print "WARNING: expected", meter.rate_count, "rates",
+-            print "but only received", len(rates)
++            print("WARNING: expected", meter.rate_count, "rates", end=' ')
++            print("but only received", len(rates))
+         for idx, rate in enumerate(rates):
+-            print "{}: info rate = {}, burst size = {}".format(
+-                idx, rate.units_per_micros, rate.burst_size)
++            print("{}: info rate = {}, burst size = {}".format(
++                idx, rate.units_per_micros, rate.burst_size))
+ 
+     def complete_meter_get_rates(self, text, line, start_index, end_index):
+         return self._complete_meters(text)
+@@ -1954,12 +2040,13 @@ class RuntimeAPI(cmd.Cmd):
+             raise UIn_Error("Bad format for index")
+         if counter.is_direct:
+             table_name = counter.binding
+-            print "this is the direct counter for table", table_name
++            print("this is the direct counter for table", table_name)
+             # index = index & 0xffffffff
+             value = self.client.bm_mt_read_counter(0, table_name, index)
+         else:
+             value = self.client.bm_counter_read(0, counter.name, index)
+-        print "%s[%d]= " % (counter_name, index), value
++        print("%s[%d]= (%d bytes, %d packets)" %
++              (counter_name, index, value.bytes, value.packets))
+ 
+     def complete_counter_read(self, text, line, start_index, end_index):
+         return self._complete_counters(text)
+@@ -1971,9 +2058,9 @@ class RuntimeAPI(cmd.Cmd):
+         self.exactly_n_args(args, 4)
+         counter_name = args[0]
+         counter = self.get_res("counter", counter_name, ResType.counter_array)
+-        index   = args[1]
+-        pkts    = args[2]
+-        byts    = args[3]
++        index = args[1]
++        pkts = args[2]
++        byts = args[3]
+         try:
+             index = int(index)
+         except:
+@@ -1988,11 +2075,13 @@ class RuntimeAPI(cmd.Cmd):
+             raise UIn_Error("Bad format for bytes")
+         if counter.is_direct:
+             table_name = counter.binding
+-            print "writing to direct counter for table", table_name
+-            value = self.client.bm_mt_write_counter(0, table_name, index, BmCounterValue(packets=pkts, bytes = byts))
++            print("writing to direct counter for table", table_name)
++            value = self.client.bm_mt_write_counter(
++                0, table_name, index, BmCounterValue(bytes=byts, packets=pkts))
+         else:
+-            self.client.bm_counter_write(0, counter_name, index, BmCounterValue(packets=pkts, bytes = byts))
+-        print "%s[%d] has been updated" % (counter_name, index)
++            self.client.bm_counter_write(
++                0, counter_name, index, BmCounterValue(bytes=byts, packets=pkts))
++        print("%s[%d] has been updated" % (counter_name, index))
+ 
+     def complete_counter_write(self, text, line, start_index, end_index):
+         return self._complete_counters(text)
+@@ -2006,7 +2095,7 @@ class RuntimeAPI(cmd.Cmd):
+         counter = self.get_res("counter", counter_name, ResType.counter_array)
+         if counter.is_direct:
+             table_name = counter.binding
+-            print "this is the direct counter for table", table_name
++            print("this is the direct counter for table", table_name)
+             value = self.client.bm_mt_reset_counters(0, table_name)
+         else:
+             value = self.client.bm_counter_reset_all(0, counter.name)
+@@ -2033,12 +2122,12 @@ class RuntimeAPI(cmd.Cmd):
+             except:
+                 raise UIn_Error("Bad format for index")
+             value = self.client.bm_register_read(0, register.name, index)
+-            print "{}[{}]=".format(register_name, index), value
++            print("{}[{}]=".format(register_name, index), value)
+         else:
+             sys.stderr.write("register index omitted, reading entire array\n")
+             entries = self.client.bm_register_read_all(0, register.name)
+-            print "{}=".format(register_name), ", ".join(
+-                [str(e) for e in entries])
++            print("{}=".format(register_name), ", ".join(
++                [str(e) for e in entries]))
+ 
+     def complete_register_read(self, text, line, start_index, end_index):
+         return self._complete_registers(text)
+@@ -2083,36 +2172,36 @@ class RuntimeAPI(cmd.Cmd):
+         return self._complete_res(REGISTER_ARRAYS, text)
+ 
+     def dump_action_and_data(self, action_name, action_data):
+-        print "Action entry: {} - {}".format(
+-            action_name, ", ".join([hexstr(a) for a in action_data]))
++        print("Action entry: {} - {}".format(
++            action_name, ", ".join([hexstr(a) for a in action_data])))
+ 
+     def dump_action_entry(self, a_entry):
+         if a_entry.action_type == BmActionEntryType.NONE:
+-            print "EMPTY"
++            print("EMPTY")
+         elif a_entry.action_type == BmActionEntryType.ACTION_DATA:
+             self.dump_action_and_data(a_entry.action_name, a_entry.action_data)
+         elif a_entry.action_type == BmActionEntryType.MBR_HANDLE:
+-            print "Index: member({})".format(a_entry.mbr_handle)
++            print("Index: member({})".format(a_entry.mbr_handle))
+         elif a_entry.action_type == BmActionEntryType.GRP_HANDLE:
+-            print "Index: group({})".format(a_entry.grp_handle)
++            print("Index: group({})".format(a_entry.grp_handle))
+ 
+     def dump_one_member(self, member):
+-        print "Dumping member {}".format(member.mbr_handle)
++        print("Dumping member {}".format(member.mbr_handle))
+         self.dump_action_and_data(member.action_name, member.action_data)
+ 
+     def dump_members(self, members):
+         for m in members:
+-            print "**********"
++            print("**********")
+             self.dump_one_member(m)
+ 
+     def dump_one_group(self, group):
+-        print "Dumping group {}".format(group.grp_handle)
+-        print "Members: [{}]".format(", ".join(
+-            [str(h) for h in group.mbr_handles]))
++        print("Dumping group {}".format(group.grp_handle))
++        print("Members: [{}]".format(", ".join(
++            [str(h) for h in group.mbr_handles])))
+ 
+     def dump_groups(self, groups):
+         for g in groups:
+-            print "**********"
++            print("**********")
+             self.dump_one_group(g)
+ 
+     def dump_one_entry(self, table, entry):
+@@ -2120,35 +2209,39 @@ class RuntimeAPI(cmd.Cmd):
+             out_name_w = max(20, max([len(t[0]) for t in table.key]))
+ 
+         def dump_exact(p):
+-             return hexstr(p.exact.key)
++            return hexstr(p.exact.key)
++
+         def dump_lpm(p):
+             return "{}/{}".format(hexstr(p.lpm.key), p.lpm.prefix_length)
++
+         def dump_ternary(p):
+             return "{} &&& {}".format(hexstr(p.ternary.key),
+                                       hexstr(p.ternary.mask))
++
+         def dump_range(p):
+             return "{} -> {}".format(hexstr(p.range.start),
+                                      hexstr(p.range.end_))
++
+         def dump_valid(p):
+             return "01" if p.valid.key else "00"
+         pdumpers = {"exact": dump_exact, "lpm": dump_lpm,
+                     "ternary": dump_ternary, "valid": dump_valid,
+                     "range": dump_range}
+ 
+-        print "Dumping entry {}".format(hex(entry.entry_handle))
+-        print "Match key:"
++        print("Dumping entry {}".format(hex(entry.entry_handle)))
++        print("Match key:")
+         for p, k in zip(entry.match_key, table.key):
+             assert(k[1] == p.type)
+             pdumper = pdumpers[MatchType.to_str(p.type)]
+-            print "* {0:{w}}: {1:10}{2}".format(
++            print("* {0:{w}}: {1:10}{2}".format(
+                 k[0], MatchType.to_str(p.type).upper(),
+-                pdumper(p), w=out_name_w)
++                pdumper(p), w=out_name_w))
+         if entry.options.priority >= 0:
+-            print "Priority: {}".format(entry.options.priority)
++            print("Priority: {}".format(entry.options.priority))
+         self.dump_action_entry(entry.action_entry)
+         if entry.life is not None:
+-            print "Life: {}ms since hit, timeout is {}ms".format(
+-                entry.life.time_since_hit_ms, entry.life.timeout_ms)
++            print("Life: {}ms since hit, timeout is {}ms".format(
++                entry.life.time_since_hit_ms, entry.life.timeout_ms))
+ 
+     @handle_bad_input
+     def do_table_dump_entry(self, line):
+@@ -2238,13 +2331,13 @@ class RuntimeAPI(cmd.Cmd):
+     def _dump_act_prof(self, act_prof):
+         act_prof_name = act_prof.name
+         members = self.client.bm_mt_act_prof_get_members(0, act_prof.name)
+-        print "=========="
+-        print "MEMBERS"
++        print("==========")
++        print("MEMBERS")
+         self.dump_members(members)
+         if act_prof.with_selection:
+             groups = self.client.bm_mt_act_prof_get_groups(0, act_prof.name)
+-            print "=========="
+-            print "GROUPS"
++            print("==========")
++            print("GROUPS")
+             self.dump_groups(groups)
+ 
+     @handle_bad_input
+@@ -2269,11 +2362,11 @@ class RuntimeAPI(cmd.Cmd):
+         table = self.get_res("table", table_name, ResType.table)
+         entries = self.client.bm_mt_get_entries(0, table.name)
+ 
+-        print "=========="
+-        print "TABLE ENTRIES"
++        print("==========")
++        print("TABLE ENTRIES")
+ 
+         for e in entries:
+-            print "**********"
++            print("**********")
+             self.dump_one_entry(table, e)
+ 
+         if table.type_ == TableType.indirect or\
+@@ -2283,11 +2376,11 @@ class RuntimeAPI(cmd.Cmd):
+ 
+         # default entry
+         default_entry = self.client.bm_mt_get_default_entry(0, table.name)
+-        print "=========="
+-        print "Dumping default entry"
++        print("==========")
++        print("Dumping default entry")
+         self.dump_action_entry(default_entry)
+ 
+-        print "=========="
++        print("==========")
+ 
+     def complete_table_dump(self, text, line, start_index, end_index):
+         return self._complete_tables(text)
+@@ -2314,12 +2407,13 @@ class RuntimeAPI(cmd.Cmd):
+         match_key = args[1:]
+         if len(match_key) != table.num_key_fields():
+             raise UIn_Error(
+-                "Table %s needs %d key fields" % (table_name, table.num_key_fields())
++                "Table %s needs %d key fields" % (
++                    table_name, table.num_key_fields())
+             )
+         match_key = parse_match_key(table, match_key)
+ 
+         entry = self.client.bm_mt_get_entry_from_key(
+-            0, table.name, match_key, BmAddEntryOptions(priority = priority))
++            0, table.name, match_key, BmAddEntryOptions(priority=priority))
+         self.dump_one_entry(table, entry)
+ 
+     def complete_table_dump_entry_from_key(self, text, line, start_index, end_index):
+@@ -2333,7 +2427,7 @@ class RuntimeAPI(cmd.Cmd):
+         "List parser value sets defined in the P4 program: show_pvs"
+         self.exactly_n_args(line.split(), 0)
+         for pvs_name in sorted(PARSE_VSETS):
+-            print PARSE_VSETS[pvs_name].parse_vset_str()
++            print(PARSE_VSETS[pvs_name].parse_vset_str())
+ 
+     @handle_bad_input
+     def do_pvs_add(self, line):
+@@ -2382,7 +2476,7 @@ class RuntimeAPI(cmd.Cmd):
+ 
+         values = self.client.bm_parse_vset_get(0, pvs_name)
+         for v in values:
+-            print hexstr(v)
++            print(hexstr(v))
+ 
+     def complete_pvs_get(self, text, line, start_index, end_index):
+         return self._complete_pvs(text)
+@@ -2433,15 +2527,15 @@ class RuntimeAPI(cmd.Cmd):
+         "Shows the ports connected to the switch: show_ports"
+         self.exactly_n_args(line.split(), 0)
+         ports = self.client.bm_dev_mgr_show_ports()
+-        print "{:^10}{:^20}{:^10}{}".format(
+-            "port #", "iface name", "status", "extra info")
+-        print "=" * 50
++        print("{:^10}{:^20}{:^10}{}".format(
++            "port #", "iface name", "status", "extra info"))
++        print("=" * 50)
+         for port_info in ports:
+             status = "UP" if port_info.is_up else "DOWN"
+             extra_info = "; ".join(
+                 [k + "=" + v for k, v in port_info.extra.items()])
+-            print "{:^10}{:^20}{:^10}{}".format(
+-                port_info.port_num, port_info.iface_name, status, extra_info)
++            print("{:^10}{:^20}{:^10}{}".format(
++                port_info.port_num, port_info.iface_name, status, extra_info))
+ 
+     @handle_bad_input
+     def do_switch_info(self, line):
+@@ -2451,7 +2545,7 @@ class RuntimeAPI(cmd.Cmd):
+         attributes = [t[2] for t in info.thrift_spec[1:]]
+         out_attr_w = 5 + max(len(a) for a in attributes)
+         for a in attributes:
+-            print "{:{w}}: {}".format(a, getattr(info, a), w=out_attr_w)
++            print("{:{w}}: {}".format(a, getattr(info, a), w=out_attr_w))
+ 
+     @handle_bad_input
+     def do_reset_state(self, line):
+@@ -2517,8 +2611,11 @@ class RuntimeAPI(cmd.Cmd):
+     def complete_set_crc32_parameters(self, text, line, start_index, end_index):
+         return self._complete_crc(text, 32)
+ 
++
+ def load_json_config(standard_client=None, json_path=None, architecture_spec=None):
+-    load_json_str(utils.get_json_config(standard_client, json_path), architecture_spec)
++    load_json_str(utils.get_json_config(
++        standard_client, json_path), architecture_spec)
++
+ 
+ def main():
+     args = get_parser().parse_args()
+@@ -2532,5 +2629,6 @@ def main():
+ 
+     RuntimeAPI(args.pre, standard_client, mc_client).cmdloop()
+ 
++
+ if __name__ == '__main__':
+     main()
+-- 
+2.33.1
+
