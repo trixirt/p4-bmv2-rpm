@@ -25,6 +25,7 @@ BuildRequires:  boost-devel
 BuildRequires:  gcc-c++ gmp-devel
 BuildRequires:  Judy-devel json-c-devel
 BuildRequires:  libpcap-devel libtool
+BuildRequires:  python3-devel
 BuildRequires:  nanomsg-devel
 
 Requires:       boost
